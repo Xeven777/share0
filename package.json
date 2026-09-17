@@ -1,0 +1,33 @@
+{
+  "name": "share0",
+  "version": "0.1.0",
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "bonjour-service": "^1.4.4",
+    "cac": "^6.7.14",
+    "clipboardy": "^4.0.0",
+    "qrcode-terminal": "^0.12.0",
+    "werift": "^0.24.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  },
+  "bin": {
+    "share0": "./apps/cli/index.ts"
+  },
+  "description": "Share files from your machine, without uploading them anywhere.",
+  "private": true,
+  "scripts": {
+    "dev": "bun run apps/cli/index.ts",
+    "start": "bun run apps/cli/index.ts",
+    "build": "bun build apps/cli/index.ts --target bun --outdir dist --minify",
+    "test": "bun test",
+    "doctor": "bun run apps/cli/index.ts doctor"
+  },
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

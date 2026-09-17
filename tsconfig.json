@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["bun"],
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@share/core": ["./packages/core/src/index.ts"],
+      "@share/core/*": ["./packages/core/src/*"],
+      "@share/server": ["./packages/server/src/index.ts"],
+      "@share/server/*": ["./packages/server/src/*"],
+      "@share/transfer": ["./packages/transfer/src/index.ts"],
+      "@share/transfer/*": ["./packages/transfer/src/*"],
+      "@share/transport": ["./packages/transport/src/index.ts"],
+      "@share/transport/*": ["./packages/transport/src/*"],
+      "@share/protocol": ["./packages/protocol/src/index.ts"],
+      "@share/protocol/*": ["./packages/protocol/src/*"],
+      "@share/discovery": ["./packages/discovery/src/index.ts"],
+      "@share/discovery/*": ["./packages/discovery/src/*"],
+      "@share/archive": ["./packages/archive/src/index.ts"],
+      "@share/archive/*": ["./packages/archive/src/*"]
+    }
+  },
+  "include": ["apps/**/*", "packages/**/*", "tests/**/*"]
+}
