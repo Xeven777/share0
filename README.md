@@ -10,14 +10,24 @@ Scan the QR code or open the link on any device. No account, no app, no upload.
 
 ## Install
 
+### Binary (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Xeven777/share0/main/scripts/install.sh | bash
+```
+
+Or download manually from [Releases](https://github.com/Xeven777/share0/releases).
+
+### From source
+
 Requires [Bun](https://bun.sh) >= 1.1.
 
 ```bash
-# install globally
-bun link
-
-# or run directly
+bun install
+# run directly
 bun run apps/cli/index.ts send ./file.mp4
+# or link globally
+bun link
 ```
 
 ## Usage
@@ -133,7 +143,11 @@ It needs to reach the signaling URL first. If ICE can't punch through (symmetric
 
 ```
 apps/cli/commands/{send,receive,list,stop,doctor}.ts
-apps/web/src/
 packages/{core,server,transfer,transport,protocol,discovery,archive}/
+scripts/{build.ts,install.sh}
 tests/
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).

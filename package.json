@@ -22,6 +22,7 @@
     "dev": "bun run apps/cli/index.ts",
     "start": "bun run apps/cli/index.ts",
     "build": "bun build apps/cli/index.ts --target bun --outdir dist --minify",
+    "build:binaries": "bun run scripts/build.ts",
     "test": "bun test",
     "doctor": "bun run apps/cli/index.ts doctor"
   },

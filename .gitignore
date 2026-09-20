@@ -3,5 +3,3 @@ dist/
 *.zip
 .share/
 .DS_Store
-apps/web/dist/
-apps/web/node_modules/
