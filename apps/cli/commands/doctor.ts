@@ -52,7 +52,7 @@ export async function runDoctor(): Promise<void> {
       return { ok: true, detail: "no blocking host firewall detected (if phone can't reach LAN URL: check AP isolation / VPN / guest Wi-Fi — see README troubleshooting)" };
     }],
     ["UPnP/NAT-PMP", async () => {
-      const { defaultGatewayIp, upnpDiscover, upnpExternalIp } = await import("@share/transport/upnp");
+      const { defaultGatewayIp, upnpDiscover, upnpExternalIp, natpmpPublicAddress } = await import("@share/transport/upnp");
       const gw = await defaultGatewayIp();
       if (!gw) return { ok: false, detail: "no default gateway found" };
       const svc = await upnpDiscover(2000).catch(() => null);
@@ -60,7 +60,9 @@ export async function runDoctor(): Promise<void> {
         const ext = await upnpExternalIp(svc).catch(() => null);
         return { ok: true, detail: `IGD via ${gw}${ext ? `, external ${ext}` : ""}` };
       }
-      return { ok: false, detail: `no UPnP IGD (gateway ${gw}); NAT-PMP mapping will be attempted on --upnp/--public` };
+      const ext = await natpmpPublicAddress(gw, 2000).catch(() => null);
+      if (ext) return { ok: true, detail: `no UPnP IGD; NAT-PMP via ${gw} (external ${ext})` };
+      return { ok: false, detail: `no UPnP IGD; gateway ${gw} doesn't answer NAT-PMP (direct IPv4 unavailable)` };
     }],
     ["NAT", async () => {
       // Heuristic: compare router external IP (if UPnP) or public echo vs LAN.

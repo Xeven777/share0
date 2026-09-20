@@ -53,32 +53,17 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
     console.log("  · advertised on LAN via mDNS (share0 discover)");
   } catch { /* mDNS unavailable */ }
 
-  console.log(`
-╭──────────────────────────────────────────────────╮
-│ SHARE · RECEIVE                                    │
-│                                                    │
-│ Saving to  ${dir}
-│                                                    │
-│ Upload URL                                         │
-│ ${url}
-│                                                    │${passwordRaw ? `
-│ Password   ${passwordRaw}
-│                                                    │` : ""}
-│ Push from another device:                          │
-│   share0 send ./file --to ${url}
-│                                                    │
-│ Press Ctrl+C to stop                               │
-╰──────────────────────────────────────────────────╯`);
+  const ui = await import("@share/ui");
+  console.log(ui.header("share0 receive"));
+  console.log(`\n  Saving to  ${dir}`);
+  console.log(ui.sectionLabel("Upload URL"));
+  console.log(`  ${ui.cyan(url)}`);
+  if (passwordRaw) console.log(`\n  Password   ${ui.bold(passwordRaw)}`);
+  console.log(`\n  Push from another device:\n    share0 send ./file --to ${url}`);
+  console.log(`\n  Press Ctrl+C to stop`);
 
-  try {
-    const qr = (await import("qrcode-terminal")).default;
-    qr.generate(url, { small: true });
-  } catch { /* noop */ }
-  try {
-    const { default: clipboardy } = await import("clipboardy");
-    await clipboardy.write(url);
-    console.log("\nCopied URL to clipboard.");
-  } catch { /* noop */ }
+  await ui.printQR("QR · Scan to open inbox", url);
+  if (await ui.copyToClipboard(url)) console.log("\nCopied URL to clipboard.");
 
   if (flags.expires) {
     const { parseExpires } = await import("@share/core");

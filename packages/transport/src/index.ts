@@ -115,8 +115,10 @@ export async function selectTransports(
   let candidates = [...allTunnelAdapters];
   if (req.preferredTunnel) {
     const want = req.preferredTunnel.toLowerCase();
-    candidates = candidates.filter((t) => t.name.toLowerCase() === want);
-    if (!candidates.length) throw new Error(`Unknown tunnel provider "${req.preferredTunnel}". Available: ${allTunnelAdapters.map((t) => t.name).join(", ")}`);
+    if (want !== "auto" && want !== "ask") {
+      candidates = candidates.filter((t) => t.name.toLowerCase() === want);
+      if (!candidates.length) throw new Error(`Unknown tunnel provider "${req.preferredTunnel}". Available: auto, ask, ${allTunnelAdapters.map((t) => t.name).join(", ")}`);
+    }
   }
 
   // Check availability in priority order
@@ -145,7 +147,7 @@ export async function selectTransports(
 
   // Open + verify each candidate in order; print only links proven to route.
   // (Some providers issue a URL before edge routing exists — e.g. cloudflare
-  // quick tunnels can 404 for minutes. We never show a dead link.)
+  // quick tunnels can 404/530 for a minute+. We never show a dead link.)
   let healthy = false;
   for (const t of ordered) {
     onLog(`  → opening ${t.name}…`);
@@ -158,7 +160,7 @@ export async function selectTransports(
     }
     const url = eps[0]?.url ?? "";
     onLog(`  → verifying ${t.name} routes traffic…`);
-    if (url && (await probeTunnelHealthy(url))) {
+    if (url && (await probeTunnelHealthy(url, 60_000))) {
       pub.push(...eps);
       opened.push(t);
       notes.push(`Public via ${t.name}.`);

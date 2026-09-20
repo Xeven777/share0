@@ -44,8 +44,10 @@ share0 send secret.pdf --password 482719     # custom password
 share0 send ./video.mp4 --expires 30m        # auto-expire after 30 min
 share0 send ./video.mp4 --downloads 1        # limit to 1 download
 share0 send ./video.mp4 --upnp               # enable UPnP port mapping
-share0 send ./video.mp4 --public             # expose via tunnel
-share0 send ./video.mp4 --public --tunnel pinggy
+share0 send ./video.mp4 --public             # expose via tunnel (picks provider)
+share0 send ./video.mp4 --public --tunnel pinggy  # force provider: auto, ask, pinggy, localxpose, cloudflare, localtunnel, localhost.run, zrok
+share0 send ./video.mp4 --qr=off             # QR control: all, local, public, off (--no-qr works too)
+share0                                        # no args → interactive menu
 share0 send ./video.mp4 --no-p2p             # disable WebRTC P2P
 share0 send ./video.mp4 --detach             # run in background
 ```

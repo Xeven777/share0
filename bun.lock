@@ -17,10 +17,6 @@
         "typescript": "^5.6.0",
       },
     },
-    "apps/web": {
-      "name": "@share/web",
-      "version": "0.1.0",
-    },
     "packages/archive": {
       "name": "@share/archive",
       "version": "0.1.0",
@@ -47,6 +43,10 @@
     },
     "packages/transport": {
       "name": "@share/transport",
+      "version": "0.1.0",
+    },
+    "packages/ui": {
+      "name": "@share/ui",
       "version": "0.1.0",
     },
   },
@@ -103,7 +103,7 @@
 
     "@share/transport": ["@share/transport@workspace:packages/transport"],
 
-    "@share/web": ["@share/web@workspace:apps/web"],
+    "@share/ui": ["@share/ui@workspace:packages/ui"],
 
     "@shinyoshiaki/binary-data": ["@shinyoshiaki/binary-data@0.6.1", "", { "dependencies": { "generate-function": "^2.3.1", "is-plain-object": "^2.0.3" } }, "sha512-7HDb/fQAop2bCmvDIzU5+69i+UJaFgIVp99h1VzK1mpg1JwSODOkjbqD7ilTYnqlnadF8C4XjpwpepxDsGY6+w=="],
 

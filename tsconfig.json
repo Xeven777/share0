@@ -22,7 +22,9 @@
       "@share/discovery": ["./packages/discovery/src/index.ts"],
       "@share/discovery/*": ["./packages/discovery/src/*"],
       "@share/archive": ["./packages/archive/src/index.ts"],
-      "@share/archive/*": ["./packages/archive/src/*"]
+      "@share/archive/*": ["./packages/archive/src/*"],
+      "@share/ui": ["./packages/ui/src/index.ts"],
+      "@share/ui/*": ["./packages/ui/src/*"]
     }
   },
   "include": ["apps/**/*", "packages/**/*", "tests/**/*"]

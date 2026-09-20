@@ -3,6 +3,8 @@ import {
   buildSoapEnvelope,
   buildSsdpSearch,
   natPmpMapRequest,
+  natpmpResultName,
+  parseNatPmpMapResponse,
   parseSsdpLocation,
   randomExternalPort,
 } from "@share/transport/upnp";
@@ -43,6 +45,32 @@ describe("upnp helpers", () => {
       expect(p).toBeGreaterThanOrEqual(49152);
       expect(p).toBeLessThanOrEqual(65535);
     }
+  });
+
+  test("nat-pmp map response: success parses, refusal is surfaced (RFC 6886 §3.5)", () => {
+    const ok = Buffer.alloc(16);
+    ok[0] = 0; ok[1] = 130; // MAP-TCP response
+    ok.writeUInt16BE(0, 2); // result: success
+    ok.writeUInt32BE(1234, 4);
+    ok.writeUInt16BE(8787, 8);
+    ok.writeUInt16BE(51234, 10);
+    ok.writeUInt32BE(3600, 12);
+    expect(parseNatPmpMapResponse(ok)).toEqual({
+      resultCode: 0, epoch: 1234, internalPort: 8787, externalPort: 51234, lifetime: 3600,
+    });
+    // Refused (code 2) must NOT look like a mapping to port 0.
+    const refused = Buffer.from(ok);
+    refused.writeUInt16BE(2, 2);
+    refused.writeUInt16BE(0, 10);
+    refused.writeUInt32BE(0, 12);
+    expect(parseNatPmpMapResponse(refused)?.resultCode).toBe(2);
+    expect(natpmpResultName(2)).toMatch(/Refused/);
+    expect(natpmpResultName(99)).toMatch(/Unknown/);
+    // Garbage is rejected, never treated as success.
+    expect(parseNatPmpMapResponse(Buffer.alloc(4))).toBeNull();
+    const wrongOp = Buffer.from(ok);
+    wrongOp[1] = 129;
+    expect(parseNatPmpMapResponse(wrongOp)).toBeNull();
   });
 });
 

@@ -1,7 +1,28 @@
 import { spawn } from "node:child_process";
-import { defineTunnelAdapter, sshTunnel } from "./base.ts";
+import { platform } from "node:os";
+import { defineTunnelAdapter, sshTunnel, waitForQuickTunnelUrl } from "./base.ts";
 
-// Cloudflare Quick Tunnel: `cloudflared tunnel --url http://localhost:PORT`
+/** Args for an isolated quick tunnel. `--config <null>` is load-bearing:
+ *  a `~/.cloudflared/config.yml` (named tunnel + ingress rules) makes
+ *  TryCloudflare unsupported per Cloudflare docs and can hijack routing —
+ *  pointing at an empty config keeps the quick tunnel self-contained. */
+export function cloudflaredArgs(port: number): string[] {
+  const nullConfig = platform() === "win32" ? "NUL" : "/dev/null";
+  return [
+    "tunnel",
+    "--no-autoupdate",
+    "--config", nullConfig,
+    "--metrics", "127.0.0.1:0",
+    "--url", `http://127.0.0.1:${port}`,
+  ];
+}
+
+// Cloudflare Quick Tunnel: `cloudflared tunnel --url http://127.0.0.1:PORT`
+// The edge assigns the hostname slightly before it can route traffic, so the
+// URL resolves only after the local `--metrics` endpoint reports a hostname
+// AND a live edge connection (`/ready`). `--no-autoupdate` skips the slow
+// startup update check; explicit 127.0.0.1 avoids `localhost` resolving to
+// ::1 on hosts where the server listens on IPv4 only.
 export const cloudflareTunnel = defineTunnelAdapter({
   name: "cloudflare",
   priority: 60,
@@ -13,31 +34,10 @@ export const cloudflareTunnel = defineTunnelAdapter({
     supportsLongLivedSessions: false, // quick tunnels are dev/test oriented
   },
   start: (port: number) => {
-    const child = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${port}`], {
+    const child = spawn("cloudflared", cloudflaredArgs(port), {
       stdio: ["ignore", "pipe", "pipe"],
     });
-    const url = new Promise<string>((resolve, reject) => {
-      let buf = "";
-      const timer = setTimeout(() => reject(new Error("cloudflared timed out")), 30_000);
-      const re = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
-      const onData = (d: Buffer) => {
-        buf += d.toString();
-        const m = re.exec(buf);
-        if (m) {
-          clearTimeout(timer);
-          child.stdout?.off("data", onData);
-          child.stderr?.off("data", onData);
-          resolve(m[0]);
-        }
-      };
-      child.stdout?.on("data", onData);
-      child.stderr?.on("data", onData);
-      child.on("exit", (code) => {
-        clearTimeout(timer);
-        reject(new Error(`cloudflared exited (${code}): ${buf.slice(-500)}`));
-      });
-    });
-    return { child, url };
+    return { child, url: waitForQuickTunnelUrl(child, "cloudflared", 60_000) };
   },
 });
 

@@ -25,6 +25,11 @@ export interface SendFlags {
   zip?: boolean;
   public?: boolean;
   tunnel?: string;
+  qr?: string;
+  noClipboard?: boolean;
+  quiet?: boolean;
+  json?: boolean;
+  yes?: boolean;
   /** Push files to a receive endpoint instead of hosting (Phase 3). */
   to?: string;
   /** Request a temporary UPnP/NAT-PMP mapping (Phase 3). Implied by --public. */
@@ -150,43 +155,121 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
   let port = flags.port ?? 8787;
   const { getOffer, submitAnswer, closePeer, weriftAvailable } = await import("@share/transport");
   const p2pEnabled = !flags.noP2p && (await weriftAvailable());
+
+  // --- interactive scope + tunnel picker (TTY only) ---
+  const ui = await import("@share/ui");
+  const interactive = ui.isInteractive({ yes: flags.yes, quiet: flags.quiet, json: flags.json });
+  let wantPublic = !!flags.public;
+  let tunnelOpt = flags.tunnel;
+  const tunnelLower = tunnelOpt?.toLowerCase();
+  if (tunnelOpt && tunnelLower !== "auto" && tunnelLower !== "ask") wantPublic = true;
+  if (interactive && !wantPublic && !tunnelOpt && !flags.to) {
+    wantPublic = await ui.confirm("Expose publicly via tunnel? (LAN-only otherwise)", false);
+  }
+  if (wantPublic && (!tunnelOpt || tunnelLower === "ask") && interactive) {
+    const { allTunnelAdapters } = await import("@share/transport");
+    const { fitsSession } = await import("@share/transfer");
+    const { guessUpstreamMbps } = await import("@share/discovery");
+    const upstream = guessUpstreamMbps();
+    type Cand = { name: string; available: boolean; detail?: string; priority: number; caps?: unknown };
+    const cands: Cand[] = [];
+    for (const t of allTunnelAdapters) {
+      try {
+        const st = await t.detect();
+        cands.push({
+          name: t.name,
+          available: st.available,
+          detail: st.detail,
+          priority: t.priority,
+          caps: (t as unknown as { capabilities?: unknown }).capabilities,
+        });
+      } catch {
+        cands.push({ name: t.name, available: false, detail: "detect failed", priority: t.priority });
+      }
+    }
+    cands.sort((a, b) => a.priority - b.priority);
+    const fitNote = (c: Cand): string => {
+      if (!c.available) return c.detail ?? "unavailable";
+      try {
+        const fits = fitsSession(size, upstream, c.caps as never);
+        return `${c.detail ?? "ready"} · ${fits ? "fits this file" : "may not fit long transfer"}`;
+      } catch {
+        return c.detail ?? "ready";
+      }
+    };
+    const ready = cands.filter((c) => c.available);
+    if (ready.length > 1) {
+      const pick = await ui.select("Which tunnel provider?", [
+        { value: "__auto__", label: "Auto (recommended)", hint: "pick fastest healthy" },
+        ...cands.map((c) => ({
+          value: c.name,
+          label: `${c.available ? "✓ " : "✗ "}${c.name}`,
+          hint: fitNote(c),
+        })),
+      ]);
+      tunnelOpt = pick === "__auto__" ? undefined : pick;
+    } else if (ready.length === 1) {
+      console.log(`\n${ui.dim(`Only ${ready[0]!.name} is available — using it.`)}`);
+      tunnelOpt = ready[0]!.name;
+    } else {
+      console.log(ui.warnLine("No tunnel provider available — sharing LAN-only."));
+      wantPublic = false;
+      tunnelOpt = undefined;
+    }
+  } else if (tunnelLower === "auto" || tunnelLower === "ask") {
+    // Non-interactive --tunnel ask/auto both mean automatic selection.
+    tunnelOpt = undefined;
+  }
   const server = await listenWithFallback(session, roots, port, {
     getOffer: () => getOffer(id),
     submitAnswer: (sdp: string) => submitAnswer(id, sdp),
   });
-  port = server.port;
+  port = server.port ?? port;
 
   // --- transports (LAN → IPv6 → UPnP → WebRTC → tunnel) ---
-  console.log("\nPreparing share…\n");
-  console.log(`  File       ${serveName}`);
-  console.log(`  Size       ${formatBytes(size)}`);
-  console.log("\nConnectivity\n");
-  const sel = await selectTransports(
-    port,
-    {
-      sizeBytes: size,
-      public: !!flags.public,
-      preferredTunnel: flags.tunnel,
-      upnp: !!(flags.upnp || flags.public),
-      p2p: p2pEnabled
-        ? {
-            sessionId: id,
-            getFiles: () => p2pFiles(session, roots),
-            onEvent: (m) => console.log(`  [p2p] ${m}`),
-          }
-        : undefined,
-    },
-    (m) => console.log(m)
-  );
-  for (const n of sel.notes) console.log(`  · ${n}`);
+  const quiet = !!flags.quiet;
+  const jsonMode = !!flags.json;
+  if (!quiet && !jsonMode) {
+    console.log(ui.header());
+    console.log(`  ${ui.bold("File")}  ${serveName}  ${ui.dim(formatBytes(size))}`);
+  }
+  const logFn = quiet || jsonMode ? () => {} : (m: string) => console.log(m);
+  if (!quiet && !jsonMode) console.log(ui.sectionLabel("Connectivity"));
+  let sel;
+  try {
+    sel = await selectTransports(
+      port,
+      {
+        sizeBytes: size,
+        public: wantPublic,
+        preferredTunnel: tunnelOpt,
+        upnp: !!(flags.upnp || wantPublic),
+        p2p: p2pEnabled
+          ? {
+              sessionId: id,
+              getFiles: () => p2pFiles(session, roots),
+              onEvent: (m) => { if (!quiet && !jsonMode) console.log(`  [p2p] ${m}`); },
+            }
+          : undefined,
+      },
+      logFn
+    );
+  } catch (e) {
+    console.error(`Error: ${(e as Error).message}`);
+    try { server.stop(); } catch { /* noop */ }
+    process.exit(1);
+  }
+  if (!quiet && !jsonMode) {
+    for (const n of sel.notes) console.log(`  ${ui.dim("· " + n)}`);
+  }
 
   // Host firewall blocks phone→laptop LAN traffic while loopback still works
   // (the classic "opens on laptop, nothing on phone"). Warn with the fix.
   try {
     const { detectBlockingFirewall, p2pUdpFix } = await import("@share/discovery");
     const fw = await detectBlockingFirewall(port);
-    if (fw.active) {
-      console.log(`\n⚠ Host firewall (${fw.tool}) is ACTIVE — phones on Wi-Fi CANNOT reach the LAN URL.`);
+    if (fw.active && !quiet && !jsonMode) {
+      console.log(ui.warnLine(`Host firewall (${fw.tool}) is ACTIVE — phones on Wi-Fi CANNOT reach the LAN URL.`));
       console.log(`  Fix (one command, stays working for future shares):`);
       console.log(`    ${fw.fix}`);
       if (fw.tool) {
@@ -199,41 +282,67 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
   const localUrl = sel.local[0]?.url ?? `http://127.0.0.1:${port}`;
   const shareUrl = (base: string) => `${base}/s/${id}/`;
   const primaryLocal = shareUrl(localUrl);
+  const primaryPublic = sel.public.length ? shareUrl(sel.public[0]!.url) : undefined;
+  const p2pUrl = sel.local.find((e) => e.kind === "p2p")?.url;
 
-  console.log(`\nSelected transport: ${sel.public.length ? "tunnel (" + sel.public[0].label + ")" : "LAN"}`);
-  console.log(`\nLocal URL\n  ${primaryLocal}`);
-  for (const ep of sel.local.slice(1)) {
-    // P2P endpoints already carry the full share URL.
-    console.log(ep.kind === "p2p" ? `\nDirect P2P\n  ${ep.url}` : `  ${ep.url}/s/${id}/`);
-  }
-  if (sel.public.length) {
-    console.log("\nPublic");
-    for (const ep of sel.public) console.log(`  ${shareUrl(ep.url)}`);
-    if (sel.public.some((ep) => /pinggy/i.test(ep.label))) {
-      console.log("\nNote: free pinggy links show a one-time Pinggy caution page.");
-      console.log("Tell the recipient to tap “Enter site” to reach your files.");
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      id, name: serveName, size,
+      local: primaryLocal,
+      extraLocal: sel.local.filter((e) => e.kind !== "p2p").slice(1).map((e) => `${e.url}/s/${id}/`),
+      public: primaryPublic ?? null,
+      p2p: p2pUrl ?? null,
+      password: passwordRaw ?? null,
+      expiresAt: session.expiresAt ?? null,
+      maxDownloads: session.maxDownloads ?? null,
+    }));
+  } else if (quiet) {
+    console.log(primaryLocal);
+    if (primaryPublic) console.log(primaryPublic);
+  } else {
+    console.log(`\nSelected transport: ${sel.public.length ? "tunnel (" + sel.public[0]!.label + ")" : "LAN"}`);
+    console.log(ui.sectionLabel("Local"));
+    console.log(`  ${ui.cyan(primaryLocal)}`);
+    for (const ep of sel.local.slice(1)) {
+      // P2P endpoints already carry the full share URL.
+      if (ep.kind === "p2p") console.log(ui.sectionLabel("Direct P2P"), `\n  ${ui.cyan(ep.url)}`);
+      else console.log(`  ${ui.dim(`${ep.url}/s/${id}/`)}  ${ui.dim(`(${ep.label})`)}`);
     }
-  }
-  if (passwordRaw) console.log(`\nPassword: ${passwordRaw}`);
-  console.log(`\nDownloads: 0${session.maxDownloads ? ` / ${session.maxDownloads}` : ""}`);
-  console.log(`Expires: ${session.expiresAt ? new Date(session.expiresAt).toLocaleString() : "when stopped"}`);
+    if (sel.public.length) {
+      console.log(ui.sectionLabel("Public"));
+      for (const ep of sel.public) console.log(`  ${ui.cyan(shareUrl(ep.url))}  ${ui.dim(`(via ${ep.label})`)}`);
+      if (sel.public.some((ep) => /pinggy/i.test(ep.label))) {
+        console.log(`\nNote: free pinggy links show a one-time Pinggy caution page.`);
+        console.log("Tell the recipient to tap “Enter site” to reach your files.");
+      }
+    }
+    if (passwordRaw) console.log(`\nPassword: ${ui.bold(passwordRaw)}`);
+    console.log(`\nDownloads: 0${session.maxDownloads ? ` / ${session.maxDownloads}` : ""}`);
+    console.log(`Expires: ${session.expiresAt ? new Date(session.expiresAt).toLocaleString() : "when stopped"}`);
 
-  // QR
-  try {
-    const qr = await import("qrcode-terminal");
-    console.log("\nQR");
-    qr.default.generate(primaryLocal, { small: true });
-  } catch {
-    console.log("\n(QR unavailable — install qrcode-terminal)");
-  }
+    // QR — Local + Public by default; --qr controls scope.
+    const qrMode = (flags.qr ?? "smart").toLowerCase();
+    const showQr = qrMode !== "off";
+    if (showQr) {
+      const narrow = (process.stdout.columns ?? 80) < 70;
+      await ui.printQR("QR · Local — scan on same Wi-Fi", primaryLocal);
+      if (primaryPublic && qrMode !== "local") {
+        await ui.printQR("QR · Public — scan from anywhere", primaryPublic);
+      }
+      if (qrMode === "all" && p2pUrl && !narrow) {
+        await ui.printQR("QR · Direct P2P", p2pUrl);
+      } else if (p2pUrl && qrMode === "all" && narrow) {
+        console.log(ui.sectionLabel("Direct P2P (QR skipped — narrow terminal)"));
+        console.log(`  ${ui.cyan(p2pUrl)}`);
+      }
+    }
 
-  // Clipboard
-  try {
-    const { default: clipboardy } = await import("clipboardy");
-    await clipboardy.write(primaryLocal);
-    console.log("\nCopied local URL to clipboard.");
-  } catch {
-    console.log("\n(Clipboard copy unavailable.)");
+    // Clipboard — prefer public URL when shared publicly.
+    if (!flags.noClipboard) {
+      const toCopy = primaryPublic ?? primaryLocal;
+      const ok = await ui.copyToClipboard(toCopy);
+      console.log(ok ? `\nCopied ${primaryPublic ? "public" : "local"} URL to clipboard.` : "\n(Clipboard copy unavailable.)");
+    }
   }
 
   // Registry for `share0 list` / `share0 stop`

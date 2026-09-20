@@ -111,15 +111,114 @@ export function isPasswordPrompt(text: string): boolean {
   return /(^|\s)(password|passphrase)( for |:)/i.test(text);
 }
 
+/** Matches a `*.trycloudflare.com` quick-tunnel hostname in cloudflared logs. */
+export const QUICKTUNNEL_URL_RE = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i;
+
+/** Extract `127.0.0.1:20241` from `Starting metrics server on 127.0.0.1:20241/metrics`. */
+export function parseMetricsAddr(text: string): string | null {
+  const m = /Starting metrics server on ([0-9a-zA-Z.:\[\]-]+)\/metrics/i.exec(text);
+  return m ? m[1].trim() : null;
+}
+
+async function pollQuickTunnelReady(metricsAddr: string, deadline: number): Promise<string | null> {
+  while (Date.now() < deadline) {
+    try {
+      const q = await fetch(`http://${metricsAddr}/quicktunnel`, { signal: AbortSignal.timeout(1500) });
+      const hostname = ((await q.json().catch(() => null)) as { hostname?: string } | null)?.hostname;
+      if (hostname) {
+        // Hostname is assigned slightly before the connector can carry
+        // traffic — wait for a live edge connection too.
+        const r = await fetch(`http://${metricsAddr}/ready`, { signal: AbortSignal.timeout(1500) });
+        const body = (await r.json().catch(() => null)) as { readyConnections?: number } | null;
+        if (r.ok && (body?.readyConnections ?? 0) > 0) return `https://${hostname}`;
+      }
+    } catch { /* retry */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return null;
+}
+
+/** Resolve a cloudflared quick-tunnel URL only once the local connector
+ *  reports ready (`/quicktunnel` hostname + `/ready` connections via the
+ *  `--metrics` endpoint). Falls back to the log URL when the metrics
+ *  endpoint never appears (older cloudflared); the public `/health` probe
+ *  in `selectTransports` remains the final gate either way. */
+export function waitForQuickTunnelUrl(child: ChildProcess, name: string, timeoutMs = 60_000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let buf = "";
+    let settled = false;
+    let metricsAddr: string | null = null;
+    let polling = false;
+    let logUrl: string | null = null;
+    const deadline = Date.now() + timeoutMs;
+    const cleanup = () => {
+      clearTimeout(timer);
+      child.stdout?.off("data", onData);
+      child.stderr?.off("data", onData);
+    };
+    const succeed = (url: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(url);
+    };
+    const fail = (e: Error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(e);
+    };
+    const timer = setTimeout(() => {
+      fail(new Error(`${name} timed out waiting for tunnel to be ready`));
+      try { child.kill("SIGKILL"); } catch { /* noop */ }
+    }, timeoutMs);
+    const startPoll = () => {
+      if (polling || !metricsAddr) return;
+      polling = true;
+      void pollQuickTunnelReady(metricsAddr, deadline).then((u) => {
+        if (u) succeed(u);
+        else if (logUrl) succeed(logUrl); // ready never came; let /health probe decide
+      });
+    };
+    const onData = (d: Buffer) => {
+      buf += d.toString();
+      if (!metricsAddr) {
+        metricsAddr = parseMetricsAddr(buf);
+        if (metricsAddr) startPoll();
+      }
+      if (!logUrl) {
+        const m = QUICKTUNNEL_URL_RE.exec(buf);
+        if (m) {
+          logUrl = m[0];
+          // Give the metrics endpoint a moment to confirm readiness; if it
+          // never shows up (old binary), use the log URL as fallback.
+          setTimeout(() => {
+            if (!settled && !metricsAddr && logUrl) succeed(logUrl);
+          }, 3000);
+        }
+      }
+    };
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.on("exit", (code) => {
+      if (!settled && code !== 0 && code !== null) {
+        fail(new Error(`${name} exited (${code}): ${buf.slice(-500)}`));
+      }
+    });
+    child.on("error", (e) => fail(new Error(`${name} failed to start: ${(e as Error).message}`)));
+  });
+}
+
 /** Probe a tunnel URL until our /health answers (or timeout). Guards against
  *  providers that issue a URL before traffic actually routes (e.g. cloudflare
- *  quick tunnels returning edge 404s). Returns true when healthy. */
-export async function probeTunnelHealthy(publicUrl: string, timeoutMs = 20_000): Promise<boolean> {
+ *  quick tunnels returning edge 404/530s while the hostname propagates —
+ *  measured at 60s+ on some networks, hence the long default). True when healthy. */
+export async function probeTunnelHealthy(publicUrl: string, timeoutMs = 60_000): Promise<boolean> {
   const health = publicUrl.replace(/\/$/, "") + "/health";
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const res = await fetch(health, { signal: AbortSignal.timeout(4000) });
+      const res = await fetch(health, { signal: AbortSignal.timeout(6000) });
       if (res.ok) {
         const body = (await res.json().catch(() => null)) as { ok?: boolean } | null;
         if (body?.ok === true) return true;
