@@ -1,6 +1,6 @@
 {
   "name": "share0",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "dependencies": {
     "archiver": "^7.0.1",
     "bonjour-service": "^1.4.4",
