@@ -71,7 +71,7 @@ export function createReceiveHandler(opts: ReceiveOptions) {
       if (!req.body) return Response.json({ error: "Empty body" }, { status: 400 });
       let bytes = 0;
       try {
-        const nodeStream = Readable.fromWeb(req.body as import("node:stream/web").ReadableStream);
+        const nodeStream = Readable.fromWeb(req.body as unknown as import("node:stream/web").ReadableStream);
         await new Promise<void>((resolveP, rejectP) => {
           const out = createWriteStream(dest + ".part");
           nodeStream.on("data", (c: Buffer) => (bytes += c.length));
@@ -133,42 +133,126 @@ function renderUploadPage(passwordRequired: boolean): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>share · receive</title>
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)" />
+<title>Share0 · Receive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
-:root { color-scheme: light dark; --bg: #0b0c0e; --card: #15181d; --fg: #f2f4f6; --muted: #9aa3ad; --accent: #34c77b; }
-@media (prefers-color-scheme: light) { :root { --bg: #f4f5f7; --card: #ffffff; --fg: #14171a; --muted: #66707a; } }
-* { box-sizing: border-box; }
-body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, Inter, Roboto, sans-serif; background: var(--bg); color: var(--fg); min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.card { width: 100%; max-width: 430px; background: var(--card); border-radius: 20px; padding: 28px 24px; box-shadow: 0 12px 40px rgba(0,0,0,.25); text-align: center; }
-.brand { font-size: 12px; letter-spacing: .35em; color: var(--muted); margin-bottom: 6px; }
-h1 { font-size: 20px; margin: 6px 0 4px; }
-.sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
-.drop { border: 2px dashed var(--muted); border-radius: 14px; padding: 26px 12px; cursor: pointer; }
-.drop.over { border-color: var(--accent); }
-.btn { display: block; width: 100%; padding: 14px; border-radius: 12px; border: 0; font-size: 17px; font-weight: 650; background: var(--accent); color: #fff; cursor: pointer; margin-top: 12px; }
-input[type=password] { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--muted); font-size: 16px; margin-top: 10px; background: transparent; color: inherit; }
-ul { text-align: left; font-size: 13px; color: var(--muted); padding-left: 18px; }
-.prog { font-size: 13px; color: var(--muted); min-height: 18px; margin-top: 10px; }
+:root {
+  color-scheme: light dark;
+  --canvas: #FFFFFF;
+  --ink: #000000;
+  --ink-2: rgb(0 0 0 / 64%);
+  --ink-3: rgb(0 0 0 / 56%);
+  --line: rgb(0 0 0 / 10%);
+  --line-strong: rgb(0 0 0 / 18%);
+  --wash: rgb(0 0 0 / 4%);
+  --hover: rgb(0 0 0 / 5%);
+  --pressed: rgb(0 0 0 / 9%);
+  --danger: #B42318;
+  --ok: #067647;
+  --radius: 12px;
+  --radius-sm: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0A0A0A;
+    --ink: #FFFFFF;
+    --ink-2: rgb(255 255 255 / 56%);
+    --ink-3: rgb(255 255 255 / 46%);
+    --line: rgb(255 255 255 / 12%);
+    --line-strong: rgb(255 255 255 / 24%);
+    --wash: rgb(255 255 255 / 5%);
+    --hover: rgb(255 255 255 / 9%);
+    --pressed: rgb(255 255 255 / 14%);
+    --danger: #FDA29B;
+    --ok: #6CE9A6;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0;
+  font-family: "Inter Tight", Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, sans-serif;
+  background: var(--canvas); color: var(--ink);
+  min-height: 100dvh; display: flex; justify-content: center; align-items: flex-start;
+  padding: 40px 24px; font-size: 16px; line-height: 1.6;
+}
+.wrap { width: 100%; max-width: 520px; margin: 0 auto; }
+.card { width: 100%; background: var(--canvas); border: 1px solid var(--line); border-radius: var(--radius); padding: 24px; text-align: left; }
+.brand { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: var(--ink-2); margin: 0 0 20px; }
+.brand i { width: 8px; height: 8px; border-radius: 2px; background: var(--ink); display: inline-block; }
+h1 { font-size: 22px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; margin: 0; }
+.sub { color: var(--ink-2); font-size: 14px; line-height: 1.5; margin: 4px 0 0; }
+.drop {
+  display: block; margin-top: 16px; padding: 20px 16px; cursor: pointer;
+  border: 1px dashed var(--line-strong); border-radius: var(--radius-sm);
+  font-size: 14px; line-height: 1.5; color: var(--ink);
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+.drop small { display: block; margin-top: 4px; font-size: 13px; color: var(--ink-2); }
+.drop.over { border-color: var(--ink); background: var(--hover); }
+.drop:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; min-height: 50px; padding: 12px 16px; margin-top: 12px;
+  border-radius: var(--radius-sm); border: 1px solid var(--ink);
+  background: var(--ink); color: var(--canvas);
+  font-family: inherit; font-size: 15px; font-weight: 500; line-height: 1.5;
+  cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease;
+}
+.btn:disabled { background: var(--wash); border-color: var(--line); color: var(--ink-3); cursor: not-allowed; }
+.btn:not(:disabled):active { background: var(--pressed); }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+input[type=password] {
+  width: 100%; padding: 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong); font-family: inherit; font-size: 16px; line-height: 1.5;
+  margin-top: 16px; min-height: 50px; background: transparent; color: inherit;
+}
+input[type=password]::placeholder { color: var(--ink-3); }
+input[type=password]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+ul { margin: 12px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); font-size: 14px; }
+li { padding: 10px 0; border-bottom: 1px solid var(--line); color: var(--ink-2); }
+li.bad { color: var(--danger); }
+.prog { font-size: 13px; color: var(--ink-2); min-height: 20px; margin-top: 8px; }
+.foot { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:not(:disabled):hover { background: var(--hover); color: var(--ink); border-color: var(--ink); }
+  .drop:hover { background: var(--hover); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+@media (max-width: 480px) {
+  body { padding: 24px 16px; }
+  .card { padding: 20px 16px; }
+  h1 { font-size: 20px; }
+}
 </style>
 </head>
 <body>
+<div class="wrap">
 <main class="card">
-  <div class="brand">SHARE</div>
+  <div class="brand"><i aria-hidden="true"></i>Share0</div>
   <h1>Send to this device</h1>
-  <div class="sub">Files upload directly — nothing is stored anywhere else.</div>
-  ${passwordRequired ? '<input id="pw" type="password" placeholder="Password" />' : ""}
-  <label class="drop" id="drop">Tap to choose files<input id="pick" type="file" multiple hidden /></label>
-  <div class="prog" id="prog"></div>
+  <p class="sub">Files upload directly. Nothing is stored anywhere else.</p>
+  ${passwordRequired ? '<input id="pw" type="password" placeholder="Password" aria-label="Receive password" />' : ""}
+  <label class="drop" id="drop" tabindex="0">Choose files<input id="pick" type="file" multiple hidden /><small>Tap to browse, or drag files here.</small></label>
+  <div class="prog" id="prog" aria-live="polite"></div>
   <button class="btn" id="send" disabled>Upload</button>
   <ul id="done"></ul>
+  <div class="foot">Uploads go straight to this device.</div>
 </main>
+</div>
 <script>
 let files = [];
 const pick = document.getElementById("pick"), drop = document.getElementById("drop"),
       send = document.getElementById("send"), prog = document.getElementById("prog"),
       done = document.getElementById("done");
 const pw = () => (document.getElementById("pw") || {}).value || "";
-drop.onclick = () => pick.click();
+drop.onclick = (e) => { if (e.target !== pick) pick.click(); };
+drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick.click(); } };
 pick.onchange = () => { files = [...pick.files]; send.disabled = !files.length; prog.textContent = files.length ? files.length + " file(s) selected" : ""; };
 ["dragover","dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("over"); }));
 ["dragleave","drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("over"); }));
@@ -182,7 +266,8 @@ send.onclick = async () => {
       headers: Object.assign({ "content-type": "application/octet-stream" }, pw() ? { "x-share-password": pw() } : {}),
     });
     const li = document.createElement("li");
-    li.textContent = r.ok ? "✓ " + f.name : "✗ " + f.name + " (" + r.status + ")";
+    li.textContent = r.ok ? "Uploaded — " + f.name : "Failed — " + f.name + " (" + r.status + ")";
+    if (!r.ok) li.className = "bad";
     done.append(li);
   }
   prog.textContent = "Done.";

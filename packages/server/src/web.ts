@@ -1,5 +1,3 @@
-// Bundled receiver web app — single-file HTML, no build step.
-// Ships inside the CLI; keep under ~40KB, system fonts, no external assets.
 export function renderReceiverPage(opts: { shareId: string; passwordRequired: boolean }): string {
   const { shareId, passwordRequired } = opts;
   return `<!DOCTYPE html>
@@ -7,96 +5,209 @@ export function renderReceiverPage(opts: { shareId: string; passwordRequired: bo
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#0b0c0e" />
-<title>share0 · ${escapeHtml(shareId)}</title>
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0A0A0A" media="(prefers-color-scheme: dark)" />
+<title>Share0 · ${escapeHtml(shareId)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&display=swap" rel="stylesheet" />
 <style>
-:root { color-scheme: light dark; --bg: #0b0c0e; --bg2: radial-gradient(120% 90% at 50% 0%, #1a2233 0%, #0b0c0e 60%);
-  --card: #14171d; --stroke: rgba(255,255,255,.09); --fg: #f2f4f6; --muted: #9aa3ad;
-  --accent: #4f8cff; --accent2: #7aa5ff; --ok: #34d399; --danger: #ff6b6b; --radius: 20px; }
-@media (prefers-color-scheme: light) { :root { --bg: #eef1f5; --bg2: radial-gradient(120% 90% at 50% 0%, #ffffff 0%, #eef1f5 65%);
-  --card: #ffffff; --stroke: rgba(20,23,26,.09); --fg: #14171a; --muted: #66707a; } }
+:root {
+  color-scheme: light dark;
+  --canvas: #FFFFFF;
+  --ink: #000000;
+  --ink-2: rgb(0 0 0 / 64%);
+  --ink-3: rgb(0 0 0 / 56%);
+  --line: rgb(0 0 0 / 10%);
+  --line-strong: rgb(0 0 0 / 18%);
+  --wash: rgb(0 0 0 / 4%);
+  --hover: rgb(0 0 0 / 5%);
+  --pressed: rgb(0 0 0 / 9%);
+  --track: rgb(0 0 0 / 8%);
+  --danger: #B42318;
+  --ok: #067647;
+  --radius: 12px;
+  --radius-sm: 10px;
+  --btn-hover: #262626;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0A0A0A;
+    --ink: #FFFFFF;
+    --ink-2: rgb(255 255 255 / 56%);
+    --ink-3: rgb(255 255 255 / 46%);
+    --line: rgb(255 255 255 / 12%);
+    --line-strong: rgb(255 255 255 / 24%);
+    --wash: rgb(255 255 255 / 5%);
+    --hover: rgb(255 255 255 / 9%);
+    --pressed: rgb(255 255 255 / 14%);
+    --track: rgb(255 255 255 / 12%);
+    --danger: #FDA29B;
+    --ok: #6CE9A6;
+    --btn-hover: #E6E6E6;
+  }
+}
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, Roboto, "Segoe UI", sans-serif;
-  background: var(--bg); background-image: var(--bg2); color: var(--fg);
-  min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-.wrap { width: 100%; max-width: 460px; }
-.card { width: 100%; background: var(--card); border: 1px solid var(--stroke); border-radius: var(--radius);
-  padding: 26px 22px 20px; box-shadow: 0 18px 60px rgba(0,0,0,.30); text-align: center; }
-.brand { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; letter-spacing: .32em;
-  color: var(--muted); margin-bottom: 16px; font-weight: 700; }
-.brand i { width: 10px; height: 10px; border-radius: 3px; background: linear-gradient(135deg, var(--accent), #a855f7);
-  display: inline-block; box-shadow: 0 0 12px rgba(79,140,255,.7); }
-.fileicon { width: 58px; height: 58px; margin: 2px auto 10px; border-radius: 16px; display: flex; align-items: center;
-  justify-content: center; font-size: 28px; background: rgba(79,140,255,.12); border: 1px solid var(--stroke); }
-.name { font-size: 20px; font-weight: 700; word-break: break-all; margin: 4px 0; letter-spacing: -.01em; }
-.meta { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
-.pills { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px 0 4px; }
-.pill { font-size: 11px; font-weight: 700; letter-spacing: .04em; padding: 5px 10px; border-radius: 999px;
-  border: 1px solid var(--stroke); color: var(--muted); background: rgba(127,127,127,.10); }
-.pill.live { color: var(--ok); border-color: rgba(52,211,153,.4); }
-.btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 52px; padding: 14px;
-  border-radius: 14px; border: 0; font-size: 17px; font-weight: 700; background: linear-gradient(180deg, var(--accent2), var(--accent));
-  color: #fff; cursor: pointer; text-decoration: none; margin-top: 10px; box-shadow: 0 8px 24px rgba(79,140,255,.35); }
-.btn:active { transform: scale(.99); }
-.btn.secondary { background: transparent; border: 1px solid var(--muted); color: var(--fg); box-shadow: none; min-height: 48px; font-size: 15px; }
-.btn.ghost { background: rgba(127,127,127,.12); box-shadow: none; min-height: 44px; font-size: 14px; color: var(--fg); }
-.bar { height: 6px; border-radius: 999px; background: rgba(127,127,127,.2); overflow: hidden; margin-top: 10px; }
-.bar > div { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #a855f7); transition: width .2s; }
-.preview { margin: 14px 0; border-radius: 14px; overflow: hidden; max-height: 46dvh; display: flex; align-items: center;
-  justify-content: center; background: rgba(127,127,127,.12); border: 1px solid var(--stroke); }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: "Inter Tight", Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", Roboto, "Segoe UI", sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 24px;
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: 0;
+}
+.wrap { width: 100%; max-width: 520px; margin: 0 auto; }
+.card {
+  width: 100%;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: left;
+}
+.brand {
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+  font-size: 13px; font-weight: 500; line-height: 1.5;
+  color: var(--ink-2); margin: 0 0 20px;
+}
+.brand i { width: 8px; height: 8px; border-radius: 2px; background: var(--ink); display: inline-block; flex: none; }
+.filehead { display: flex; gap: 12px; align-items: flex-start; }
+.filebadge {
+  width: 40px; height: 40px; border-radius: var(--radius-sm); flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 500; letter-spacing: .02em;
+  color: var(--ink-2); background: var(--wash); border: 1px solid var(--line);
+}
+.filename { min-width: 0; flex: 1; }
+.name { font-size: 22px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; margin: 0; word-break: break-word; }
+.meta { color: var(--ink-2); font-size: 14px; line-height: 1.5; margin: 4px 0 0; word-break: break-word; }
+.status {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 16px 0 0; padding: 12px 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  font-size: 13px; line-height: 1.5; color: var(--ink-2);
+}
+.status .dot { width: 7px; height: 7px; border-radius: 999px; background: var(--ok); flex: none; }
+.status .sep { color: var(--ink-3); }
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 50px; padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-family: inherit; font-size: 15px; font-weight: 500; line-height: 1.5;
+  cursor: pointer; text-decoration: none; text-align: center;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.btn.primary { background: var(--ink); border: 1px solid var(--ink); color: var(--canvas); margin-top: 16px; }
+.btn.secondary { background: transparent; border: 1px solid var(--line-strong); color: var(--ink); margin-top: 8px; }
+.btn.quiet { background: var(--wash); border: 1px solid transparent; color: var(--ink); margin-top: 8px; min-height: 48px; font-size: 14px; }
+.btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.bar { height: 4px; border-radius: 999px; background: var(--track); overflow: hidden; margin-top: 12px; }
+.bar > div { height: 100%; width: 0%; background: var(--ink); transition: width .2s ease; }
+.preview {
+  margin: 16px 0 0; border-radius: var(--radius-sm); overflow: hidden;
+  max-height: 46dvh; display: flex; align-items: center; justify-content: center;
+  background: var(--wash); border: 1px solid var(--line);
+}
 .preview img, .preview video { max-width: 100%; max-height: 46dvh; display: block; }
 .preview audio { width: 100%; }
 .preview iframe, .preview pre { width: 100%; max-height: 46dvh; border: 0; text-align: left; }
-pre { padding: 12px; font-size: 12px; overflow: auto; white-space: pre-wrap; margin: 0; }
-.filelist { text-align: left; margin: 12px 0 4px; border-top: 1px solid var(--stroke); }
-.filelist a { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 4px;
-  border-bottom: 1px solid var(--stroke); color: inherit; text-decoration: none; font-size: 14px; min-height: 48px; }
-.filelist a span:last-child { color: var(--muted); white-space: nowrap; }
-.filelist .fi { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(127,127,127,.14); font-size: 15px; flex: none; }
-.pwrow { display: flex; gap: 8px; margin-top: 10px; }
-input[type=password], input[type=text] { flex: 1; padding: 13px 12px; border-radius: 12px; border: 1px solid var(--muted);
-  font-size: 16px; background: transparent; color: inherit; min-height: 48px; }
-.err { color: var(--danger); font-size: 13px; min-height: 18px; margin-top: 6px; }
-.prog { font-size: 12px; color: var(--muted); min-height: 16px; margin-top: 8px; }
-.foot { margin-top: 14px; font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.hash { margin-top: 8px; font-size: 11px; color: var(--muted); word-break: break-all; }
-.hint { margin-top: 12px; text-align: center; font-size: 12px; color: var(--muted); }
+pre { padding: 12px; font-size: 13px; line-height: 1.6; overflow: auto; white-space: pre-wrap; margin: 0; color: var(--ink); }
+.filelist { margin: 8px 0 0; border-top: 1px solid var(--line); }
+.filelist a {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  padding: 12px 0; border-bottom: 1px solid var(--line);
+  color: inherit; text-decoration: none; font-size: 14px; line-height: 1.5; min-height: 52px;
+  border-radius: 4px;
+}
+.filelist a span:last-child { color: var(--ink-2); white-space: nowrap; }
+.filelist .fi {
+  width: 28px; height: 28px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--wash); border: 1px solid var(--line);
+  font-size: 10px; font-weight: 500; color: var(--ink-2); flex: none;
+}
+.filelist .fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gate-title { font-size: 22px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; margin: 0; }
+.gate-sub { color: var(--ink-2); font-size: 14px; line-height: 1.5; margin: 4px 0 0; }
+.pwrow { display: flex; gap: 8px; margin-top: 16px; }
+.pwrow input[type=password], .pwrow input[type=text] {
+  flex: 1; min-width: 0; padding: 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  font-family: inherit; font-size: 16px; line-height: 1.5;
+  background: transparent; color: inherit; min-height: 50px;
+}
+.pwrow input::placeholder { color: var(--ink-3); }
+.pwrow input:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.pwrow .btn { width: auto; margin-top: 0; padding: 12px 16px; flex: none; }
+.err { color: var(--danger); font-size: 13px; line-height: 1.5; min-height: 20px; margin-top: 8px; }
+.prog { font-size: 13px; line-height: 1.5; color: var(--ink-2); min-height: 20px; margin-top: 8px; }
+.foot {
+  margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line);
+  font-size: 12px; line-height: 1.5; color: var(--ink-2);
+  display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  text-align: left;
+}
+.hash { margin-top: 8px; font-size: 12px; line-height: 1.5; color: var(--ink-2); word-break: break-all; text-align: left; }
+.hint { margin-top: 16px; text-align: left; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+@media (hover: hover) and (pointer: fine) {
+  .btn.primary:hover { background: var(--btn-hover); border-color: var(--btn-hover); }
+  .btn.secondary:hover { background: var(--hover); }
+  .btn.quiet:hover { background: var(--hover); }
+  .filelist a:hover { background: var(--hover); }
+}
+.btn.primary:active, .btn.secondary:active, .btn.quiet:active { background: var(--pressed); border-color: var(--line-strong); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+@media (max-width: 480px) {
+  body { padding: 24px 16px; }
+  .card { padding: 20px 16px; }
+  .name, .gate-title { font-size: 20px; }
+}
 </style>
 </head>
 <body>
 <div class="wrap">
 <main class="card">
-  <div class="brand"><i></i>SHARE0</div>
+  <div class="brand"><i aria-hidden="true"></i>Share0</div>
   <div id="gate" ${passwordRequired ? "" : 'hidden'}>
-    <div class="fileicon">🔒</div>
-    <div class="name">Password protected</div>
-    <div class="meta">Ask the sender for the short code — e.g. 482-719.</div>
+    <h1 class="gate-title">Password protected</h1>
+    <p class="gate-sub">Ask the sender for the short code.</p>
     <div class="pwrow">
-      <input id="pw" type="password" inputmode="text" autocomplete="off" placeholder="e.g. 482-719" />
-      <button class="btn ghost" id="togglePw" type="button" style="width:auto;padding:0 16px;">Show</button>
+      <input id="pw" type="password" inputmode="text" autocomplete="off" placeholder="Short code" aria-label="Share password" />
+      <button class="btn quiet" id="togglePw" type="button">Show</button>
     </div>
-    <button class="btn" id="unlock">Unlock</button>
-    <div class="err" id="gate-err"></div>
+    <button class="btn primary" id="unlock">Unlock</button>
+    <div class="err" id="gate-err" role="alert"></div>
   </div>
   <div id="app" ${passwordRequired ? "hidden" : ""}>
-    <div class="fileicon" id="fileicon">📄</div>
-    <div class="name" id="name">…</div>
-    <div class="meta" id="meta">Loading…</div>
-    <div class="pills"><span class="pill live" id="live">● live</span><span class="pill" id="expires">…</span></div>
+    <div class="filehead">
+      <span class="filebadge" id="fileicon" aria-hidden="true">File</span>
+      <div class="filename">
+        <h1 class="name" id="name">…</h1>
+        <p class="meta" id="meta">Loading…</p>
+      </div>
+    </div>
+    <div class="status"><span class="dot" aria-hidden="true"></span><span id="live">Live</span><span class="sep" aria-hidden="true">·</span><span id="expires">…</span></div>
     <div class="preview" id="preview" hidden></div>
     <div class="filelist" id="filelist" hidden></div>
-    <a class="btn" id="download">↓ Download</a>
+    <a class="btn primary" id="download">Download</a>
     <div class="bar" id="dlbar" hidden><div id="dlfill"></div></div>
     <a class="btn secondary" id="download-all" hidden>Get all as .zip</a>
-    <a class="btn secondary" id="p2p" hidden>⚡ Try direct P2P</a>
-    <button class="btn ghost" id="copyLink" type="button">Copy link</button>
-    <div class="prog" id="p2p-status"></div>
+    <a class="btn secondary" id="p2p" hidden>Try direct P2P</a>
+    <button class="btn quiet" id="copyLink" type="button">Copy link</button>
+    <div class="prog" id="p2p-status" aria-live="polite"></div>
     <div class="hash" id="hash"></div>
   </div>
-  <div class="foot"><span id="foot-id">id ${escapeHtml(shareId)}</span><span>Sent directly · not uploaded</span></div>
+  <div class="foot"><span id="foot-id">ID ${escapeHtml(shareId)}</span><span>Sent directly · Not uploaded</span></div>
 </main>
-<div class="hint">Open on any phone or laptop — no account, no app.</div>
+<div class="hint">Open on any phone or laptop. No account, no app.</div>
 </div>
 <script>
 const SHARE_ID = ${JSON.stringify(shareId)};
@@ -116,14 +227,18 @@ function fmtBytes(n) {
   do { v /= 1024; i++; } while (v >= 1024 && i < u.length - 1);
   return (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)) + " " + u[i];
 }
-function iconFor(mime, name) {
-  if (mime.startsWith("image/")) return "🖼️";
-  if (mime.startsWith("video/")) return "🎬";
-  if (mime.startsWith("audio/")) return "🎵";
-  if (mime === "application/pdf") return "📕";
-  if (mime.includes("zip") || /\\.zip$/i.test(name || "")) return "🗜️";
-  if (mime.startsWith("text/") || mime.includes("json") || mime.includes("markdown")) return "📝";
-  return "📄";
+function labelFor(mime, name) {
+  const base = (name || "").split("/").pop() || "";
+  const ext = base.includes(".") ? base.split(".").pop().toUpperCase().slice(0, 4) : "";
+  if (ext && /^[A-Z0-9]{2,4}$/.test(ext)) return ext;
+  mime = mime || "";
+  if (mime.startsWith("image/")) return "IMG";
+  if (mime.startsWith("video/")) return "VID";
+  if (mime.startsWith("audio/")) return "AUD";
+  if (mime === "application/pdf") return "PDF";
+  if (mime.includes("zip")) return "ZIP";
+  if (mime.startsWith("text/") || mime.includes("json") || mime.includes("markdown")) return "TXT";
+  return "File";
 }
 function showGate() {
   document.getElementById("gate").hidden = false;
@@ -136,21 +251,21 @@ function showApp() {
 async function load() {
   const meta = await api("/api/share");
   document.getElementById("name").textContent = meta.name;
-  document.getElementById("meta").textContent = fmtBytes(meta.size) + (meta.isDirectory ? " · folder" : "");
-  document.getElementById("fileicon").textContent = iconFor(meta.mime || "", meta.name);
+  document.getElementById("meta").textContent = fmtBytes(meta.size) + (meta.isDirectory ? " · Folder" : "");
+  document.getElementById("fileicon").textContent = labelFor(meta.mime || "", meta.name);
   const dl = document.getElementById("download");
   dl.href = "/s/" + SHARE_ID + "/download/" + encodeURIComponent(meta.name) + q();
   dl.download = meta.name;
   if (meta.expiresAt) {
     const tick = () => {
       const ms = meta.expiresAt - Date.now();
-      document.getElementById("expires").textContent = ms <= 0 ? "expired" : "expires in " + Math.max(1, Math.round(ms/60000)) + " min";
+      document.getElementById("expires").textContent = ms <= 0 ? "Expired" : "Expires in " + Math.max(1, Math.round(ms/60000)) + " min";
     };
     tick(); setInterval(tick, 15000);
   } else {
-    document.getElementById("expires").textContent = "expires when sender stops";
+    document.getElementById("expires").textContent = "Expires when sender stops";
   }
-  if (meta.sha256) document.getElementById("hash").textContent = "sha256 " + meta.sha256.slice(0, 32) + "…";
+  if (meta.sha256) document.getElementById("hash").textContent = "SHA-256 " + meta.sha256.slice(0, 32) + "…";
   try {
     const files = await api("/api/files");
     if (files.length > 1 || meta.isDirectory) {
@@ -161,15 +276,15 @@ async function load() {
         const a = document.createElement("a");
         a.href = "/s/" + SHARE_ID + "/download/" + f.path + q();
         a.download = decodeURIComponent(f.path).split("/").pop();
-        const icon = document.createElement("span"); icon.className = "fi"; icon.textContent = iconFor(f.mime || "", f.path);
-        const l = document.createElement("span"); l.style.flex = "1"; l.textContent = decodeURIComponent(f.path);
+        const icon = document.createElement("span"); icon.className = "fi"; icon.setAttribute("aria-hidden", "true"); icon.textContent = labelFor(f.mime || "", f.path);
+        const l = document.createElement("span"); l.className = "fname"; l.textContent = decodeURIComponent(f.path);
         const r = document.createElement("span"); r.textContent = fmtBytes(f.size);
         a.append(icon, l, r); list.append(a);
       }
       const all = document.getElementById("download-all");
       all.hidden = false;
       all.href = "/s/" + SHARE_ID + "/download-all" + q();
-      dl.textContent = files.length === 1 ? "↓ Download" : "↓ Download first file";
+      dl.textContent = files.length === 1 ? "Download" : "Download first file";
       if (files.length > 1) dl.href = "/s/" + SHARE_ID + "/download/" + files[0].path + q();
     } else if (files.length === 1) {
       renderPreview(files[0]);
@@ -181,7 +296,7 @@ function renderPreview(f) {
   const box = document.getElementById("preview");
   const url = "/s/" + SHARE_ID + "/preview/" + f.path + q();
   box.hidden = false; box.innerHTML = "";
-  document.getElementById("fileicon").textContent = iconFor(f.mime || "", f.name);
+  document.getElementById("fileicon").textContent = labelFor(f.mime || "", f.name);
   if (f.mime.startsWith("image/")) {
     const img = document.createElement("img"); img.src = url; img.alt = f.name; img.loading = "lazy"; box.append(img);
   } else if (f.mime.startsWith("video/")) {
@@ -189,7 +304,7 @@ function renderPreview(f) {
   } else if (f.mime.startsWith("audio/")) {
     const a = document.createElement("audio"); a.src = url; a.controls = true; a.preload = "metadata"; box.append(a);
   } else if (f.mime === "application/pdf") {
-    const fr = document.createElement("iframe"); fr.src = url; fr.style.height = "40dvh"; box.append(fr);
+    const fr = document.createElement("iframe"); fr.src = url; fr.title = f.name; fr.style.height = "40dvh"; box.append(fr);
   } else if (f.mime.startsWith("text/") || f.mime.includes("json") || f.mime.includes("markdown")) {
     fetch(url).then(r => r.text()).then(t => {
       const pre = document.createElement("pre"); pre.textContent = t.slice(0, 20000); box.append(pre);
@@ -210,7 +325,7 @@ document.getElementById("unlock").onclick = async () => {
     sessionStorage.setItem("share-pw-" + SHARE_ID, password);
     showApp(); await load();
   } catch (e) {
-    document.getElementById("gate-err").textContent = e.code === 401 ? "Wrong password, try again." : e.message;
+    document.getElementById("gate-err").textContent = e.code === 401 ? "Wrong password. Try again." : e.message;
   }
 };
 document.getElementById("pw").addEventListener("keydown", (e) => {
@@ -221,7 +336,7 @@ document.getElementById("copyLink").onclick = async (e) => {
   const btn = document.getElementById("copyLink");
   try {
     await navigator.clipboard.writeText(location.href);
-    btn.textContent = "Copied ✓";
+    btn.textContent = "Copied";
   } catch {
     btn.textContent = "Copy failed — long-press the URL";
   }
@@ -299,7 +414,7 @@ async function p2pStart() {
         }
       };
     };
-    pc.onconnectionstatechange = () => { if (pc.connectionState === "failed") p2pSetStatus("P2P failed — use Download above."); };
+    pc.onconnectionstatechange = () => { if (pc.connectionState === "failed") p2pSetStatus("P2P failed. Use Download above."); };
     await pc.setRemoteDescription({ type: "offer", sdp: offer });
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
@@ -314,9 +429,9 @@ async function p2pStart() {
       body: JSON.stringify({ answer: pc.localDescription.sdp }),
     });
     if (!post.ok) throw new Error("signaling failed: " + post.status);
-    p2pSetStatus("Signaling done — establishing direct connection…");
+    p2pSetStatus("Signaling done. Establishing direct connection…");
   } catch (e) {
-    p2pSetStatus("P2P unavailable (" + e.message + ") — use Download above.");
+    p2pSetStatus("P2P unavailable (" + e.message + "). Use Download above.");
     p2pBtn.hidden = false;
   }
 }

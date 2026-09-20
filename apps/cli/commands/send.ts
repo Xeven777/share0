@@ -109,14 +109,23 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
   let zipPath: string | undefined;
   let serveName: string;
   let source: ShareSession["source"];
+  const uiEarly = await import("@share/ui");
   if (flags.zip) {
     const id = nanoid(4);
     const base = multi ? "share" : basename(abs[0]);
     serveName = base.endsWith(".zip") ? base : `${base}.zip`;
     zipPath = join(tmpdir(), `share-${id}.zip`);
-    console.log(`Creating archive ${serveName}…`);
+    const animateZip = !flags.quiet && !flags.json && uiEarly.canAnimate();
+    const zipTicker = animateZip
+      ? uiEarly.startLiveLine((t) => `Creating archive ${serveName} ${uiEarly.frameAt(uiEarly.SPINNER, t)}`)
+      : null;
+    if (!animateZip) console.log(`Creating archive ${serveName}…`);
     await createZip(abs, zipPath, zipPassword);
     size = statSync(zipPath).size;
+    if (zipTicker) {
+      zipTicker.stop();
+      console.log(`Archive ready: ${serveName} (${formatBytes(size)})`);
+    }
     source = { type: "file", path: zipPath };
   } else if (!multi && !isDir) {
     serveName = basename(abs[0]);
@@ -385,7 +394,21 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
 
   console.log("\nPress Ctrl+C to stop.");
 
+  // Live waiting line: spinner + download count + elapsed. Reads
+  // session.downloads on every frame so it stays current for free.
+  let stopWaiting: (() => void) | null = null;
+  if (!quiet && !jsonMode && ui.canAnimate()) {
+    stopWaiting = ui.startLiveLine((t) => {
+      const n = session.downloads;
+      return ui.dim(
+        `Waiting for recipient ${ui.frameAt(ui.SPINNER, t)} · ` +
+          `${n} download${n === 1 ? "" : "s"} · ${ui.formatElapsed(t)}`
+      );
+    }).stop;
+  }
+
   const cleanup = async () => {
+    stopWaiting?.();
     console.log("\nStopping share…");
     for (const t of sel.opened) {
       try { await t.close(); } catch { /* noop */ }

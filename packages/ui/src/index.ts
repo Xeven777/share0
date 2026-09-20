@@ -1,5 +1,6 @@
 export * from "./theme.ts";
 export * from "./prompt.ts";
+export * from "./anim.ts";
 
 export interface TunnelCandidate {
   name: string;

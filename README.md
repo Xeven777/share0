@@ -1,155 +1,238 @@
-# share0
+<p align="center">
+  <h1 align="center">share0</h1>
+  <p align="center"><strong>A Dead Simple CLI tool to share files from your machine, without uploading them anywhere.</strong></p>
+  <p align="center">One command. A link and a QR code. Any browser can download. No account. No cloud.</p>
+</p>
+<p align="center">
+  <a href="https://github.com/Xeven777/share0/stargazers"><img src="https://img.shields.io/github/stars/Xeven777/share0?style=social" alt="GitHub stars" /></a>
+  <a href="https://github.com/Xeven777/share0/network/members"><img src="https://img.shields.io/github/forks/Xeven777/share0?style=social" alt="GitHub forks" /></a>
+  <a href="https://github.com/Xeven777/share0/releases"><img src="https://img.shields.io/github/v/release/Xeven777/share0?display_name=tag" alt="Latest release" /></a>
+  <a href="https://github.com/Xeven777/share0/issues"><img src="https://img.shields.io/github/issues/Xeven777/share0" alt="Open issues" /></a>
+  <a href="https://github.com/Xeven777/share0/blob/main/LICENSE"><img src="https://img.shields.io/github/license/Xeven777/share0" alt="MIT license" /></a>
+</p>
 
-Share files from your machine, without uploading them anywhere.
+<img src="./Share0.webp" alt="share0 pic" width="100%" />
+
+<p align="center">
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-%E2%89%A51.1-black?logo=bun" alt="Built with Bun" /></a>
+  <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue" alt="Linux, macOS, Windows" />
+  <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
+</p>
+
+<p align="center">
+  <a href="#-quick-start">Quick start</a> •
+  <a href="#-usage">Usage</a> •
+  <a href="#-how-it-works">How it works</a> •
+  <a href="#-troubleshooting">Troubleshooting</a> •
+  <a href="#-contributing">Contributing</a>
+</p>
+
+---
 
 ```bash
 share0 send ./video.mp4
 ```
 
-Scan the QR code or open the link on any device. No account, no app, no upload.
+```text
+Local  http://192.168.1.42:8787/a8Fd
+QR     scan with your phone camera
+Done   link is in your clipboard
+Press Ctrl+C to stop
+```
 
-## Install
+That is the whole flow. If the devices share Wi-Fi, the bytes move over your network and never touch a third party server. Kill the command and the share dies.
 
-### Binary (recommended)
+If this saves you a WeTransfer upload, please [star the repo](https://github.com/Xeven777/share0). It helps more than you think.
+
+## ✨ Why people like it
+
+- 📂 **Send anything.** Single files, multiple files, full directories. Add `--zip` to serve a directory as one archive.
+- ⚡ **Starts at once, resumes on drop.** The server streams from disk with HTTP Range support. A 20 GB video never loads fully into memory.
+- 📱 **Phones just work.** The recipient scans a QR code and downloads in the browser. No app, no login.
+- 🌍 **Public when you need it.** Add `--public` and share0 opens a free tunnel, checks `/health` through it, and prints only links that answer.
+- 🔒 **Private when you need it.** Short passwords like `482-719`, expiry like `30m`, download limits like `--downloads 1`.
+- 🩺 **Fixes its own network issues.** `share0 doctor` checks ports, firewalls, IPv6, UPnP, and tunnel binaries and prints the exact fix.
+
+## 🚀 Quick start
+
+Install the binary:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Xeven777/share0/main/scripts/install.sh | bash
 ```
 
-Or download manually from [Releases](https://github.com/Xeven777/share0/releases).
+Or download it manually from [Releases](https://github.com/Xeven777/share0/releases) and put it on your PATH.
 
-### From source
-
-Requires [Bun](https://bun.sh) >= 1.1.
+Run from source with [Bun](https://bun.sh) 1.1 or newer:
 
 ```bash
 bun install
-# run directly
 bun run apps/cli/index.ts send ./file.mp4
-# or link globally
-bun link
 ```
 
-## Usage
+## 📖 Usage
 
 ### Send files
 
 ```bash
-share0 send ./photo.jpg                      # single file
-share0 send file1.jpg file2.jpg              # multiple files
-share0 send ./project                        # directory
-share0 send ./project --zip                  # compress to archive
-share0 send secret.pdf --password            # auto-generate password
-share0 send secret.pdf --password 482719     # custom password
-share0 send ./video.mp4 --expires 30m        # auto-expire after 30 min
-share0 send ./video.mp4 --downloads 1        # limit to 1 download
-share0 send ./video.mp4 --upnp               # enable UPnP port mapping
-share0 send ./video.mp4 --public             # expose via tunnel (picks provider)
-share0 send ./video.mp4 --public --tunnel pinggy  # force provider: auto, ask, pinggy, localxpose, cloudflare, localtunnel, localhost.run, zrok
-share0 send ./video.mp4 --qr=off             # QR control: all, local, public, off (--no-qr works too)
-share0                                        # no args → interactive menu
-share0 send ./video.mp4 --no-p2p             # disable WebRTC P2P
-share0 send ./video.mp4 --detach             # run in background
+share0 send ./photo.jpg
+share0 send file1.jpg file2.jpg
+share0 send ./project
+share0 send ./project --zip
+share0 send secret.pdf --password
+share0 send secret.pdf --password 482719
+share0 send ./video.mp4 --expires 30m
+share0 send ./video.mp4 --downloads 1
+share0 send ./video.mp4 --upnp
+share0 send ./video.mp4 --public
+share0 send ./video.mp4 --public --tunnel pinggy
+share0 send ./video.mp4 --qr=off
+share0 send ./video.mp4 --no-p2p
+share0 send ./video.mp4 --detach
+share0
 ```
+
+Bare `share0` opens an interactive menu. `--tunnel` accepts `auto`, `ask`, `pinggy`, `localxpose`, `cloudflare`, `localtunnel`, `localhost.run`, `zrok`. `--qr` accepts `all`, `local`, `public`, `off`.
 
 ### Receive files
 
-```bash
-share0 receive                               # start upload endpoint
-share0 receive --dir ./share-inbox           # specify save directory
-share0 receive --port 9000                   # custom port
-share0 receive --password                    # protect with password
-```
-
-### Discover nearby shares
+Turn your machine into a drop box. Someone else pushes files to you.
 
 ```bash
-share0 discover                              # find shares on LAN
+share0 receive
+share0 receive --dir ./share-inbox
+share0 receive --port 9000
+share0 receive --password
 ```
 
-### Manage active shares
+Push straight to a receive endpoint:
 
 ```bash
-share0 list                                  # list running shares
-share0 stop <id>                             # stop a share
-share0 doctor                                # run diagnostics
+share0 send ./report.pdf --to http://192.168.1.10:8788
 ```
 
-## How it works
+### Discover, list, stop, diagnose
 
+```bash
+share0 discover   # find nearby shares and receivers on the LAN
+share0 list       # show running shares
+share0 stop a8Fd  # kill one share
+share0 doctor     # check network, firewall, and tunnels
 ```
-file/folder -> transfer engine -> best transport -> browser
-   |-- LAN (default)           |-- UPnP/NAT-PMP direct (--upnp)
-   |-- free tunnel (--public)  |-- WebRTC DataChannel (auto offer)
-   |-- IPv6 direct             |-- receive push (--to)
-```
 
-- **Local-first:** files stay on your machine; tunnels are fallback transports.
-- **Streaming:** files are streamed, never fully buffered; range requests and resume work.
-- **No infrastructure:** no server, database, accounts, or cloud storage. Exiting the CLI kills the share.
+## 🔧 How it works
 
-## Transports
+Your machine serves. The browser downloads. It needs no database and no accounts. Exit the CLI and the share ends.
 
-share0 automatically selects the best available transport.
-
-| Transport | When | How |
+| Transport | When share0 uses it | How it moves bytes |
 |---|---|---|
-| LAN | Same network (default) | Direct HTTP to sender's IP |
-| IPv6 | Direct connectivity | Native IPv6 address |
-| UPnP/NAT-PMP | Router supports it | Temporary port mapping (`--upnp`) |
-| WebRTC P2P | Auto offer included | DataChannel, ICE via STUN |
-| Tunnel | Public access needed | Free tunnel providers (`--public`) |
+| LAN | Same Wi-Fi or cable, the default | Direct HTTP to your LAN IP |
+| IPv6 | Both sides have direct IPv6 | Direct HTTP to your IPv6 address |
+| UPnP | You pass `--upnp` | Short lived router port mapping, removed on exit |
+| WebRTC P2P | Offered by default, uses UDP 52000 to 52100 | Browser DataChannel with STUN for NAT traversal |
+| Tunnel | You pass `--public` | Free tunnel adapter, link checked with `/health` before display |
 
-### Tunnel providers
+Tunnel adapters today include Pinggy, LocalXpose, Cloudflare quick tunnel, LocalTunnel, localhost.run, and zrok. Pinggy free sessions run about 60 minutes and suit most temporary links. zrok free allows 5 GB per day and suits small shares. share0 skips dead links and tries the next provider.
 
-| Provider | Notes |
-|---|---|
-| Pinggy | ~60 min free session; default choice |
-| LocalXpose | Long-lived candidate (`loclx` binary) |
-| Cloudflare | Quick tunnel (`cloudflared`), dev/test oriented |
-| LocalTunnel | Fallback (`npx localtunnel`) |
-| localhost.run | SSH fallback, speed-limited |
-| zrok | 5 GB/day -- small shares only |
+### share0 vs the usual tools
 
-## Troubleshooting
+| Task | Cloud upload tools | share0 |
+|---|---|---|
+| Send a 10 GB video | Wait for upload, then wait for download, pay for storage | Stream it from disk, start at once, pay nothing |
+| Share on home Wi-Fi | Still round trips through a data center | Moves over LAN at LAN speed |
+| Share with a phone | Ask them to install an app and make an account | They scan a QR code in the camera app |
+| End access | Hope the expiry setting worked | Press Ctrl+C, the server stops, the URL dies |
 
-**Phone can't open the LAN URL (same Wi-Fi)?**
+## ❓ Troubleshooting
 
-Check in order:
+<details>
+<summary><strong>Phone cannot open the LAN URL on the same Wi-Fi</strong></summary>
 
-1. Phone is on Wi-Fi (not mobile data) with no VPN active.
-2. Not a guest/hotel/office network (AP isolation blocks phone <-> laptop).
-3. Laptop firewall -- the usual suspect. `share0 doctor` flags it and prints the fix:
-   - ufw: `sudo ufw allow 8787/tcp`
-   - firewalld: `sudo firewall-cmd --add-port=8787/tcp --permanent && sudo firewall-cmd --reload`
-4. Multiple networks? The CLI prints all LAN IPs -- try each one.
-5. Switched networks after starting? The CLI warns if your IP changes.
+Work through this list in order.
 
-**Pinggy shows a warning page?**
+1. Confirm the phone uses Wi-Fi, not mobile data, with no VPN active.
+2. Skip guest, hotel, and office networks. Many block device to device traffic.
+3. Check the laptop firewall. `share0 doctor` flags a blocked port and prints the fix.
+4. The CLI prints every LAN IP it finds. Try each one.
+5. If you switched networks after starting, restart the share. The CLI warns when your IP changes.
 
-That's Pinggy's one-time "Caution" screening on free links. The recipient just has to tap **Enter site**. Programmatic clients (curl) skip it automatically.
+Fix a blocked port 8787:
 
-**Tunnel link gives 404?**
-
-Some providers issue a URL before edge routing exists. share0 verifies every public link before printing -- dead links are skipped and the next provider is tried.
-
-**SSH asks for a password (Pinggy)?**
-
-Press Enter -- empty password is the documented answer for free tunnels.
-
-**P2P button does nothing?**
-
-It needs to reach the signaling URL first. If ICE can't punch through (symmetric NAT), plain download remains. P2P uses UDP ports 52000-52100 -- with ufw: `sudo ufw allow 52000:52100/udp`.
-
-## Project structure
-
-```
-apps/cli/commands/{send,receive,list,stop,doctor}.ts
-packages/{core,server,transfer,transport,protocol,discovery,archive}/
-scripts/{build.ts,install.sh}
-tests/
+```bash
+sudo ufw allow 8787/tcp
 ```
 
-## License
+```bash
+sudo firewall-cmd --add-port=8787/tcp --permanent
+sudo firewall-cmd --reload
+```
 
-MIT — see [LICENSE](LICENSE).
+</details>
+
+<details>
+<summary><strong>Pinggy shows a warning page</strong></summary>
+
+That is Pinggy free link screening. The recipient taps Enter site once and the download page loads. Curl clients skip it.
+
+</details>
+
+<details>
+<summary><strong>Tunnel link returns 404</strong></summary>
+
+Some providers hand out a URL before edge routing exists. share0 requests `/health` through each tunnel and prints only links that answer. Dead links never print.
+
+</details>
+
+<details>
+<summary><strong>SSH asks for a password for Pinggy</strong></summary>
+
+Press Enter. Empty input is the documented answer for free tunnels.
+
+</details>
+
+<details>
+<summary><strong>The P2P button does nothing</strong></summary>
+
+The browser must reach the signaling URL first. Symmetric NAT often blocks UDP hole punching. Plain download still works. To open the P2P port range on ufw:
+
+```bash
+sudo ufw allow 52000:52100/udp
+```
+
+</details>
+
+## 🗺️ Roadmap
+
+- [x] LAN sharing with QR codes and clipboard copy
+- [x] Streaming with HTTP Range resume
+- [x] Passwords, expiry, download limits, ZIP mode
+- [x] Free tunnel adapters with verified links
+- [x] UPnP port mapping and WebRTC P2P offer
+- [x] Receive mode and LAN discovery
+- [ ] PWA receiver and installable share pages
+- [ ] Optional end-to-end encryption
+- [ ] Native desktop and mobile wrappers
+
+Have an idea? [Open an issue](https://github.com/Xeven777/share0/issues/new) or send a PR.
+
+## 🤝 Contributing
+
+Contributions are welcome. Big feature? Open an issue first so we agree on scope.
+
+```bash
+git clone https://github.com/Xeven777/share0.git
+cd share0
+bun install
+bun test
+bun run apps/cli/index.ts doctor
+```
+
+Please run `bun test` before pushing. Keep transport vendors behind the adapter interface in `packages/transport`, and keep `packages/core` free of vendor imports.
+
+## 🙏 Acknowledgements
+
+Built with [Bun](https://bun.sh). Tunneling via [Pinggy](https://pinggy.io), [LocalXpose](https://localxpose.io), [Cloudflare](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/), [LocalTunnel](https://github.com/localtunnel/localtunnel), [localhost.run](https://localhost.run), and [zrok](https://zrok.io). Inspired by the original `share-cli` idea of a tiny local server plus a tunnel.
+
+## 📄 License
+
+MIT. See [LICENSE](LICENSE).
