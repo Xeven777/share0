@@ -14,6 +14,12 @@
 <img src="./Share0.webp" alt="share0 pic" width="100%" />
 
 <p align="center">
+  <video src="./demo.webm" controls width="100%">
+    Your browser does not support the video tag.
+  </video>
+</p>
+
+<p align="center">
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/Bun-%E2%89%A51.1-black?logo=bun" alt="Built with Bun" /></a>
   <img src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-blue" alt="Linux, macOS, Windows" />
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs welcome" />
