@@ -91,7 +91,7 @@ cli
 cli.command("doctor", "Run diagnostics").action(async () => runDoctor());
 
 cli.help();
-cli.version("0.1.0");
+cli.version("1.0.0");
 
 // Bare `share0` → interactive menu (TTY) or pretty help (piped/CI).
 const rawArgs = process.argv.slice(2);

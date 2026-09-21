@@ -61,7 +61,7 @@ export function termWidth(fallback = 80): number {
 }
 
 export function header(title = "share0"): string {
-  const v = "v0.1.0";
+  const v = "v1.0.0";
   const line = "─".repeat(Math.max(8, Math.min(48, termWidth() - title.length - v.length - 8)));
   return `${magenta(SYMBOLS.logo)} ${bold(title)} ${dim(v)} ${dim(line)}`;
 }
