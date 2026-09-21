@@ -19,35 +19,35 @@
     },
     "packages/archive": {
       "name": "@share/archive",
-      "version": "0.1.0",
+      "version": "1.0.0",
     },
     "packages/core": {
       "name": "@share/core",
-      "version": "0.1.0",
+      "version": "1.0.0",
     },
     "packages/discovery": {
       "name": "@share/discovery",
-      "version": "0.1.0",
+      "version": "1.0.0",
     },
     "packages/protocol": {
       "name": "@share/protocol",
-      "version": "0.1.0",
+      "version": "1.0.0",
     },
     "packages/server": {
       "name": "@share/server",
-      "version": "0.1.0",
+      "version": "1.0.0",
     },
     "packages/transfer": {
       "name": "@share/transfer",
-      "version": "0.1.0",
+      "version": "1.0.0",
     },
     "packages/transport": {
       "name": "@share/transport",
-      "version": "0.1.0",
+      "version": "1.0.0",
     },
     "packages/ui": {
       "name": "@share/ui",
-      "version": "0.1.0",
+      "version": "1.0.0",
     },
   },
   "packages": {
