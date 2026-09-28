@@ -248,6 +248,12 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
   const { getOffer, submitAnswer, closePeer, weriftAvailable } = await import("@share/transport");
   const p2pEnabled = !flags.noP2p && (await weriftAvailable());
 
+  // Declared here because the interactive tunnel picker below logs through
+  // them. They used to be declared further down, which put this code in their
+  // temporal dead zone and threw on every interactive run.
+  const quiet = !!flags.quiet;
+  const jsonMode = !!flags.json;
+
   // --- interactive scope + tunnel picker (TTY only) ---
   const ui = await import("@share/ui");
   const interactive = ui.isInteractive({ yes: flags.yes, quiet: flags.quiet, json: flags.json });
@@ -304,8 +310,6 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
   port = server.port ?? port;
 
   // --- transports (LAN → IPv6 → UPnP → WebRTC → tunnel) ---
-  const quiet = !!flags.quiet;
-  const jsonMode = !!flags.json;
   if (!quiet && !jsonMode) {
     console.log(ui.header());
     console.log(`  ${ui.bold("File")}  ${serveName}  ${ui.dim(formatBytes(size))}`);
