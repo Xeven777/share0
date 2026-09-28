@@ -146,7 +146,7 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
       const base = flags.hub ?? hubUrl();
       if (!base) {
         console.log(
-          ui.warnLine("No hub configured, so the handle was not published. Set SHARE0_HUB or pass --hub <url>.")
+          ui.warnLine("No hub configured, so the name was not published. Set SHARE0_HUB or pass --hub <url>.")
         );
       } else {
         // 3-char codes live in their own namespace; a named handle is durable.
@@ -209,7 +209,7 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
   const cleanup = async () => {
     console.log("\nStopping receiver…");
     try { stopAdvertise?.(); } catch { /* noop */ }
-    // Stop refreshing first, then pull the handle: a clean exit shouldn't
+    // Stop refreshing first, then retract the name: a clean exit should not
     // leave a name resolving to a machine that is about to be gone.
     try { stopHeartbeat?.(); } catch { /* noop */ }
     if (published && tunnelUrl) {
@@ -217,7 +217,7 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
         const { hubUrl, retract } = await import("@share/hub");
         const base = flags.hub ?? hubUrl();
         if (base) await retract(base, published.name, published.kind);
-        console.log(`  handle "${published.name}" is no longer published.`);
+        console.log(`  name "${published.name}" is no longer published.`);
       } catch { /* best effort — the TTL is the real guarantee */ }
     }
     // Close the tunnel before the server: a leftover adapter process would

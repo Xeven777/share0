@@ -26,7 +26,7 @@ export async function runHub(flags: HubFlags): Promise<void> {
   console.log(ui.header("share0 hub"));
   console.log(`  Listening   ${ui.cyan(hub.url)}`);
   console.log(`  Storage     in-memory (cleared on exit)`);
-  console.log(`  Live keys   ${hub.store.size}`);
+  console.log(`  Live names  ${hub.store.size}`);
   console.log(`\n  Point receivers and senders at it:`);
   console.log(`    export SHARE0_HUB=${hub.url}`);
 
@@ -39,12 +39,13 @@ export async function runHub(flags: HubFlags): Promise<void> {
     }
   }
 
-  console.log(`\n  Anyone can publish a handle. No auth — don't share this publicly.`);
+  console.log(`\n  Anyone can publish a name. The hub has no auth, so keep it off the public internet.`);
   console.log(`\nPress Ctrl+C to stop.`);
 
-  // Keep the live key count visible so an operator can see handles arriving.
+  // Keep the live name count visible so an operator can see names arriving.
+  const { SYMBOLS } = await import("@share/ui");
   const timer = setInterval(() => {
-    console.log(`  · ${new Date().toLocaleTimeString()} — ${hub.store.size} live handle(s)`);
+    console.log(`  ${SYMBOLS.idle} ${new Date().toLocaleTimeString()} ${SYMBOLS.arrow} ${hub.store.size} live name(s)`);
   }, 30_000);
   timer.unref?.();
 
