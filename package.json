@@ -1,6 +1,6 @@
 {
   "name": "share0",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dependencies": {
     "archiver": "^7.0.1",
     "bonjour-service": "^1.4.4",
@@ -19,8 +19,8 @@
   "description": "Share files from your machine, without uploading them anywhere.",
   "private": true,
   "scripts": {
-    "dev": "bun run apps/cli/index.ts",
-    "start": "bun run apps/cli/index.ts",
+    "dev": "bun run scripts/version.ts && bun run apps/cli/index.ts",
+    "start": "bun run scripts/version.ts && bun run apps/cli/index.ts",
     "build": "bun build apps/cli/index.ts --target bun --outdir dist --minify",
     "build:binaries": "bun run scripts/build.ts",
     "test": "bun test",

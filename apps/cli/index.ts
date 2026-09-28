@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { CAC } from "cac";
+import { VERSION } from "@share/ui";
 import { runSend } from "./commands/send.ts";
 import { runList } from "./commands/list.ts";
 import { runStop } from "./commands/stop.ts";
@@ -121,7 +122,7 @@ cli
 cli.command("doctor", "Run diagnostics").action(async () => runDoctor());
 
 cli.help();
-cli.version("1.0.0");
+cli.version(VERSION);
 
 // Bare `share0` → interactive menu (TTY) or pretty help (piped/CI).
 const rawArgs = process.argv.slice(2);

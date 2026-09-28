@@ -60,8 +60,14 @@ export function termWidth(fallback = 80): number {
   return process.stdout.columns || fallback;
 }
 
+/** Version, injected at build time by scripts/build.ts and `bun run build`.
+ *  Reading package.json at runtime does not survive `bun build --compile`,
+ *  where import.meta.dir points inside the binary. The fallback keeps dev
+ *  runs working. */
+export const VERSION = process.env.SHARE0_VERSION ?? "0.0.0-dev";
+
 export function header(title = "share0"): string {
-  const v = "v1.0.0";
+  const v = `v${VERSION}`;
   const line = "─".repeat(Math.max(8, Math.min(48, termWidth() - title.length - v.length - 8)));
   return `${magenta(SYMBOLS.logo)} ${bold(title)} ${dim(v)} ${dim(line)}`;
 }
