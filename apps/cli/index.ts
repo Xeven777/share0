@@ -5,6 +5,7 @@ import { runList } from "./commands/list.ts";
 import { runStop } from "./commands/stop.ts";
 import { runDoctor } from "./commands/doctor.ts";
 import { runReceive } from "./commands/receive.ts";
+import { runHub } from "./commands/hub.ts";
 import { runDiscover } from "./commands/discover.ts";
 import { maybeDetachParent } from "./commands/detach.ts";
 
@@ -33,7 +34,8 @@ cli
   .option("--yes", "Skip interactive prompts")
   .option("--upnp", "Request temporary UPnP/NAT-PMP port mapping (implied by --public)")
   .option("--no-p2p", "Disable the automatic WebRTC direct-P2P offer")
-  .option("--to <url>", "Push files to a `share0 receive` endpoint instead of hosting")
+  .option("--to <target>", "Push files to a `share0 receive` endpoint (URL) or a hub handle (name) instead of hosting")
+  .option("--hub <url>", "Hub to resolve a handle against (default: $SHARE0_HUB)")
   .option("--detach", "Run in background (survives terminal close)")
   .option("--detached-child", "Internal: marker for backgrounded child")
   .action(async (paths: string[], options: Record<string, unknown>) => {
@@ -57,6 +59,7 @@ cli
       upnp: !!options.upnp,
       noP2p: !!options["no-p2p"] || options.p2p === false,
       to: options.to as string | undefined,
+      hub: options.hub as string | undefined,
     });
   });
 
@@ -66,12 +69,39 @@ cli
   .option("--dir <path>", "Directory to save into")
   .option("--password [value]", "Protect with password")
   .option("--expires <duration>", "Close the receive window after e.g. 30m")
+  .option("--public", "Expose the inbox via a tunnel so senders on other networks can reach it")
+  .option("--tunnel <name>", "Tunnel provider (auto, ask, pinggy, localxpose, cloudflare, localtunnel, localhost.run, zrok)")
+  .option("--quiet", "Print URLs only (scriptable)")
+  .option("--json", "Print inbox info as JSON")
+  .option("--yes", "Skip interactive prompts")
+  .option("--as <name>", "Publish this inbox on a hub under this name (needs --public)")
+  .option("--code", "Publish under a random 3-character code instead of a name")
+  .option("--hub <url>", "Hub to publish to (default: $SHARE0_HUB)")
   .action(async (options: Record<string, unknown>) => {
     await runReceive({
       port: options.port != null ? Number(options.port) : undefined,
       dir: options.dir as string | undefined,
       password: options.password as string | boolean | undefined,
       expires: options.expires as string | undefined,
+      public: !!options.public,
+      tunnel: options.tunnel as string | undefined,
+      quiet: !!options.quiet,
+      json: !!options.json,
+      yes: !!options.yes,
+      as: options.as as string | undefined,
+      code: !!options.code,
+      hub: options.hub as string | undefined,
+    });
+  });
+
+cli
+  .command("hub", "Run a share0 hub (handle → live URL directory) on this machine")
+  .option("--port <port>", "Port to listen on", { default: 8790 })
+  .option("--host <addr>", "Bind address (0.0.0.0 to accept remote announcements)", { default: "127.0.0.1" })
+  .action(async (options: Record<string, unknown>) => {
+    await runHub({
+      port: options.port != null ? Number(options.port) : undefined,
+      host: options.host as string | undefined,
     });
   });
 

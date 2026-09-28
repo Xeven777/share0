@@ -1,0 +1,10 @@
+name = "share0-hub"
+# Paths in this file are relative to hub/, not the repo root. Deploy from
+# inside hub/ (or use `bun run hub:deploy`) because wrangler refuses to run
+# from a directory whose parent package.json declares workspaces.
+main = "../packages/hub/src/worker.ts"
+compatibility_date = "2026-01-01"
+
+[[kv_namespaces]]
+binding = "SHARE0"
+id = "3ea6fa749c864dbfb32532cb376415dd"

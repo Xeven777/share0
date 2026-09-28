@@ -109,6 +109,9 @@ share0 receive
 share0 receive --dir ./share-inbox
 share0 receive --port 9000
 share0 receive --password
+share0 receive --public                    # reachable from any network
+share0 receive --public --as anish         # publish a reusable handle
+share0 receive --public --code             # publish a 3-character code
 ```
 
 Push straight to a receive endpoint:
@@ -116,6 +119,91 @@ Push straight to a receive endpoint:
 ```bash
 share0 send ./report.pdf --to http://192.168.1.10:8788
 ```
+
+### Inbox mode: send by name
+
+This is optional. It exists to avoid pasting tunnel URLs into chat apps, and
+it is the only feature in share0 that needs a server.
+
+The receiver publishes a name, the sender uses it.
+
+On the receiving machine, once:
+
+```bash
+share0 hub                                # on any always-on machine (see below)
+export SHARE0_HUB=https://your-hub.example
+
+share0 receive --public --as anish
+```
+
+```text
+Saving to  ./share-inbox
+
+Public
+  https://bumpy-waves-raise.loca.lt  (via localtunnel)
+
+Send to this inbox
+  share0 send ./file --to anish
+```
+
+On the sending machine, any time after:
+
+```bash
+share0 send ./holiday.zip --to anish
+```
+
+```text
+Looking up "anish" on https://your-hub.example…
+  → anish (receive) is online.
+Pushing 1 file(s) to https://bumpy-waves-raise.loca.lt…
+  ✓ holiday.zip (1.2 GB)
+Delivered 1 file(s).
+```
+
+If you send to the same person often, you type their name instead of a link.
+Use `--code` instead of `--as` for a 3-character handle you can read aloud
+once, such as `K7M`.
+
+Directories are archived automatically, so `--to anish ./photos` works.
+
+A name resolves only while the receiver is running. Receivers refresh their
+entry every 10 minutes and the hub drops anything unrefreshed after 30, so a
+stopped process stops resolving on its own. You do not have to clean up stale
+names. A push also checks that the inbox answers before it starts, so a name
+whose tunnel died in the meantime fails with a clear message instead of
+hanging.
+
+#### The hub
+
+The hub maps a name to a live URL. It never handles file bytes and stores
+nothing about your files.
+
+Run your own:
+
+```bash
+share0 hub --host 0.0.0.0                 # port 8790, in-memory
+```
+
+Or deploy it as a Cloudflare Worker, which serves the same routes over
+Workers KV. Run these from the repo root, not from `hub/`:
+
+```bash
+cd hub
+npx wrangler kv namespace create SHARE0   # paste the printed id into wrangler.toml
+npx wrangler deploy
+```
+
+`bun run hub:deploy` does the same thing and handles the directory for you.
+Wrangler refuses to run from the repo root because the root `package.json`
+declares workspaces.
+
+Set `SHARE0_HUB` on both machines to point at it. There are no accounts.
+
+The Worker free tier allows 1,000 KV writes per day. A receiver refreshing
+every 10 minutes spends 144 of them, so several inboxes fit on the free tier.
+
+The hub has no authentication. Anyone who knows its address can claim a name
+and anyone can look one up. Do not treat a name as a secret.
 
 ### Discover, list, stop, diagnose
 
@@ -215,6 +303,8 @@ sudo ufw allow 52000:52100/udp
 - [x] Free tunnel adapters with verified links
 - [x] UPnP port mapping and WebRTC P2P offer
 - [x] Receive mode and LAN discovery
+- [x] Inbox mode: hub handles, `receive --public`, `send --to <name>`
+- [ ] Sender-minted 3-character codes (`send --pair`) for one-off shares
 - [ ] PWA receiver and installable share pages
 - [ ] Optional end-to-end encryption
 - [ ] Native desktop and mobile wrappers

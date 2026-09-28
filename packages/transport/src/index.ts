@@ -1,12 +1,10 @@
 import { estimateSeconds } from "@share/core";
 import { guessUpstreamMbps } from "@share/discovery";
-import { fitsSession } from "@share/transfer";
 import { Ipv6Transport } from "./ipv6.ts";
 import { LanTransport } from "./lan.ts";
 import { UpnpTransport } from "./upnp.ts";
 import { ensureOffer, weriftAvailable, type P2PFile } from "./webrtc.ts";
-import { allTunnelAdapters } from "./tunnels/providers.ts";
-import { probeTunnelHealthy } from "./tunnels/base.ts";
+import { openTunnel } from "./tunnels/pick.ts";
 import type { Endpoint, Transport } from "./types.ts";
 
 export * from "./types.ts";
@@ -15,6 +13,8 @@ export { Ipv6Transport } from "./ipv6.ts";
 export { UpnpTransport } from "./upnp.ts";
 export { WebrtcTransport, ensureOffer, submitAnswer, getOffer, closePeer, weriftAvailable, P2P_ICE_PORT_MIN, P2P_ICE_PORT_MAX } from "./webrtc.ts";
 export { allTunnelAdapters } from "./tunnels/providers.ts";
+export { detectTunnels, filterPreferred, openTunnel, closeTunnels } from "./tunnels/pick.ts";
+export type { TunnelCandidate, OpenTunnelResult } from "./tunnels/pick.ts";
 
 export interface SelectionRequest {
   sizeBytes: number;
@@ -112,67 +112,22 @@ export async function selectTransports(
     return { local, public: pub, opened, notes };
   }
 
-  let candidates = [...allTunnelAdapters];
-  if (req.preferredTunnel) {
-    const want = req.preferredTunnel.toLowerCase();
-    if (want !== "auto" && want !== "ask") {
-      candidates = candidates.filter((t) => t.name.toLowerCase() === want);
-      if (!candidates.length) throw new Error(`Unknown tunnel provider "${req.preferredTunnel}". Available: auto, ask, ${allTunnelAdapters.map((t) => t.name).join(", ")}`);
-    }
-  }
-
-  // Check availability in priority order
-  const available: typeof candidates = [];
-  for (const t of candidates.sort((a, b) => a.priority - b.priority)) {
-    const st = await t.detect();
-    onLog(`  ${st.available ? "✓" : "·"} ${t.name}${st.detail ? ` (${st.detail})` : ""}`);
-    if (st.available) available.push(t);
-    else notes.push(`${t.name}: ${st.detail}`);
-  }
-  if (!available.length) {
-    notes.push("No tunnel provider available. Share stays LAN-only.");
+  // Delegate provider selection to the shared helper (`receive` uses it too).
+  const t = await openTunnel({
+    port,
+    sizeBytes: req.sizeBytes,
+    upstreamMbps: upstream,
+    preferredTunnel: req.preferredTunnel,
+    onLog,
+  });
+  notes.push(...t.notes);
+  if (!t.url) {
+    notes.push("Share stays LAN-only (see troubleshooting in README).");
+    await setupP2p();
     return { local, public: pub, opened, notes };
   }
-
-  // Prefer providers whose session plausibly fits the transfer
-  const fitting = available.filter((t) =>
-    fitsSession(req.sizeBytes, upstream, (t as unknown as { capabilities: Parameters<typeof fitsSession>[2] }).capabilities)
-  );
-  const ordered = [...fitting, ...available.filter((t) => !fitting.includes(t))];
-  if (fitting.length < available.length) {
-    notes.push(
-      `Estimated transfer ${Math.ceil(est / 60)} min at ~${upstream} Mbps upstream; preferring providers that fit the session.`
-    );
-  }
-
-  // Open + verify each candidate in order; print only links proven to route.
-  // (Some providers issue a URL before edge routing exists — e.g. cloudflare
-  // quick tunnels can 404/530 for a minute+. We never show a dead link.)
-  let healthy = false;
-  for (const t of ordered) {
-    onLog(`  → opening ${t.name}…`);
-    let eps: Endpoint[] = [];
-    try {
-      eps = await t.open({ port });
-    } catch (e) {
-      notes.push(`${t.name} failed: ${(e as Error).message}`);
-      continue;
-    }
-    const url = eps[0]?.url ?? "";
-    onLog(`  → verifying ${t.name} routes traffic…`);
-    if (url && (await probeTunnelHealthy(url, 60_000))) {
-      pub.push(...eps);
-      opened.push(t);
-      notes.push(`Public via ${t.name}.`);
-      healthy = true;
-      break;
-    }
-    notes.push(`${t.name} opened but traffic didn't route (skipped) — trying next.`);
-    try { await t.close(); } catch { /* noop */ }
-  }
-  if (!healthy) {
-    notes.push("No tunnel provider routed traffic. Share stays LAN-only (see troubleshooting in README).");
-  }
+  pub.push({ url: t.url, kind: "tunnel", label: t.label });
+  opened.push(...t.opened);
 
   await setupP2p();
 

@@ -30,8 +30,11 @@ export interface SendFlags {
   quiet?: boolean;
   json?: boolean;
   yes?: boolean;
-  /** Push files to a receive endpoint instead of hosting (Phase 3). */
+  /** Push files to a receive endpoint instead of hosting (Phase 3).
+   *  A bare name (not a URL) is resolved through the hub. */
   to?: string;
+  /** Hub base URL to resolve a handle against. Defaults to $SHARE0_HUB. */
+  hub?: string;
   /** Request a temporary UPnP/NAT-PMP mapping (Phase 3). Implied by --public. */
   upnp?: boolean;
   /** Disable the automatic WebRTC P2P offer (Phase 4, on by default). */
@@ -60,10 +63,90 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
   if (flags.to) {
     const { pushFiles } = await import("@share/server");
     let endpoint = flags.to.trim();
-    if (!/^https?:\/\//i.test(endpoint)) endpoint = `http://${endpoint}`;
+    const { isAbsolutePushTarget } = await import("@share/hub");
+
+    // A bare name means "look it up on the hub" — the inbox mode case, where
+    // the receiver published a name and the sender never handles a URL.
+    if (!isAbsolutePushTarget(endpoint)) {
+      const { hubUrl, resolve, inboxAnswers, HubError } = await import("@share/hub");
+      const base = flags.hub ?? hubUrl();
+      if (!base) {
+        console.error(
+          `"${endpoint}" is not a URL, and no hub is configured.\n` +
+            `  Either use a full http(s) URL, or set SHARE0_HUB to a share0 hub:\n` +
+            `    share0 hub --host 0.0.0.0     # run one\n` +
+            `    export SHARE0_HUB=https://…    # or point at a hosted one`
+        );
+        process.exit(1);
+      }
+      let found;
+      try {
+        console.log(`Looking up "${endpoint}" on ${base}…`);
+        found = await resolve(base, endpoint);
+      } catch (e) {
+        if (e instanceof HubError) {
+          console.error(
+            `${e.message}\n  The receiver's inbox may be closed, or their tunnel expired.\n` +
+              `  If they are running it, check the name they started it with: share0 receive --as <name>`
+          );
+          process.exit(1);
+        }
+        // A hub that is down, unreachable, or returning garbage must not
+        // surface as a raw stack trace — the user typed a name, not code.
+        const detail = e instanceof Error ? e.message : String(e);
+        console.error(
+          `Could not reach the hub at ${base}\n  ${detail}\n` +
+            `  Check the hub is running (share0 hub) and that ${base} is correct.`
+        );
+        process.exit(1);
+      }
+      const name = endpoint;
+      endpoint = found.url;
+      // A name outlives a dead tunnel: the hub entry lives 30 minutes and the
+      // receiver refreshes it every 10, so a tunnel that died in between still
+      // resolves. Probing turns that into a clear message instead of a push
+      // that hangs until it times out.
+      console.log(`  → ${found.label ?? found.name} is online. Checking…`);
+      if (!(await inboxAnswers(endpoint))) {
+        console.error(
+          `"${name}" points at ${found.url}, but that inbox is not answering.\n` +
+            `  Their tunnel is probably down. Ask them to run:\n` +
+            `    share0 receive --as ${name}\n` +
+            `  or push straight to the URL while it is still up.`
+        );
+        process.exit(1);
+      }
+      console.log(`  → inbox answered. Sending…`);
+    } else if (!/^https?:\/\//i.test(endpoint)) {
+      endpoint = `http://${endpoint}`;
+    }
+
+    const absPaths = paths.map((p) => resolve(p));
+    for (const p of absPaths) {
+      if (!existsSync(p)) {
+        console.error(`No such file: ${p}`);
+        process.exit(1);
+      }
+    }
+    // A directory can't be PUT as a stream, so archive it first. Anyone using
+    // an inbox will eventually try to send a folder; make it just work.
+    const toSend: string[] = [];
+    const { createZip } = await import("@share/archive");
+    for (const p of absPaths) {
+      if (statSync(p).isDirectory()) {
+        const zipPath = join(tmpdir(), `share-push-${nanoid(4)}.zip`);
+        const pw = typeof flags.password === "string" ? flags.password : undefined;
+        console.log(`Archiving ${basename(p)}…`);
+        await createZip([p], zipPath, pw);
+        toSend.push(zipPath);
+      } else {
+        toSend.push(p);
+      }
+    }
+
     const pw = typeof flags.password === "string" ? flags.password : undefined;
-    console.log(`Pushing ${paths.length} file(s) to ${endpoint}…`);
-    const done = await pushFiles(endpoint, paths.map((p) => resolve(p)), {
+    console.log(`Pushing ${toSend.length} file(s) to ${endpoint}…`);
+    const done = await pushFiles(endpoint, toSend, {
       password: pw,
       onProgress: (f, b) => console.log(`  ✓ ${f} (${formatBytes(b)})`),
     });
@@ -176,44 +259,29 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
     wantPublic = await ui.confirm("Expose publicly via tunnel? (LAN-only otherwise)", false);
   }
   if (wantPublic && (!tunnelOpt || tunnelLower === "ask") && interactive) {
-    const { allTunnelAdapters } = await import("@share/transport");
+    const { detectTunnels } = await import("@share/transport");
     const { fitsSession } = await import("@share/transfer");
     const { guessUpstreamMbps } = await import("@share/discovery");
     const upstream = guessUpstreamMbps();
-    type Cand = { name: string; available: boolean; detail?: string; priority: number; caps?: unknown };
-    const cands: Cand[] = [];
-    for (const t of allTunnelAdapters) {
+    const { candidates, ready } = await detectTunnels((m) => {
+      if (!quiet && !jsonMode) console.log(m);
+    });
+    const fitNote = (name: string, caps: unknown, available: boolean, detail?: string): string => {
+      if (!available) return detail ?? "unavailable";
       try {
-        const st = await t.detect();
-        cands.push({
-          name: t.name,
-          available: st.available,
-          detail: st.detail,
-          priority: t.priority,
-          caps: (t as unknown as { capabilities?: unknown }).capabilities,
-        });
+        const fits = fitsSession(size, upstream, caps as never);
+        return `${detail ?? "ready"} · ${fits ? "fits this file" : "may not fit long transfer"}`;
       } catch {
-        cands.push({ name: t.name, available: false, detail: "detect failed", priority: t.priority });
-      }
-    }
-    cands.sort((a, b) => a.priority - b.priority);
-    const fitNote = (c: Cand): string => {
-      if (!c.available) return c.detail ?? "unavailable";
-      try {
-        const fits = fitsSession(size, upstream, c.caps as never);
-        return `${c.detail ?? "ready"} · ${fits ? "fits this file" : "may not fit long transfer"}`;
-      } catch {
-        return c.detail ?? "ready";
+        return detail ?? "ready";
       }
     };
-    const ready = cands.filter((c) => c.available);
     if (ready.length > 1) {
       const pick = await ui.select("Which tunnel provider?", [
         { value: "__auto__", label: "Auto (recommended)", hint: "pick fastest healthy" },
-        ...cands.map((c) => ({
+        ...candidates.map((c) => ({
           value: c.name,
           label: `${c.available ? "✓ " : "✗ "}${c.name}`,
-          hint: fitNote(c),
+          hint: fitNote(c.name, c.capabilities, c.available, c.detail),
         })),
       ]);
       tunnelOpt = pick === "__auto__" ? undefined : pick;

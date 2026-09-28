@@ -24,7 +24,9 @@
       "@share/archive": ["./packages/archive/src/index.ts"],
       "@share/archive/*": ["./packages/archive/src/*"],
       "@share/ui": ["./packages/ui/src/index.ts"],
-      "@share/ui/*": ["./packages/ui/src/*"]
+      "@share/ui/*": ["./packages/ui/src/*"],
+      "@share/hub": ["./packages/hub/src/index.ts"],
+      "@share/hub/*": ["./packages/hub/src/*"]
     }
   },
   "include": ["apps/**/*", "packages/**/*", "tests/**/*"]

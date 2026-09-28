@@ -59,13 +59,24 @@ export function generateShortPassword(): string {
   return `${pick(PW_ALPHA + PW_DIGITS, 4)}-${pick(PW_ALPHA.slice(0, 8) + PW_DIGITS, 2)}`;
 }
 
+// --- Short handles: "K7M", for hub addresses (`share0 send f --to K7M`) ---
+
+/** Unambiguous alphabet: no 0/O, no 1/I/l. A handle is read aloud and typed
+ *  by a human, so the cost of a confusing character beats the extra entropy. */
+const CODE_ALPHA = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // 30 symbols, no look-alikes
+
+/** A 3-character handle. 30^3 = 27,000 addresses, which is plenty for a
+ *  personal hub and short enough to say on a phone call. Callers that want
+ *  something durable should pass a name instead (`receive --as anish`). */
+export function generateShortCode(len = 3): string {
+  return pick(CODE_ALPHA, len);
+}
+
 // --- Password hashing (scrypt via Bun.password or node:crypto fallback) ---
 export async function hashPassword(password: string): Promise<string> {
   try {
     // Bun native (fast, argon2/scrypt depending on version)
-    // @ts-expect-error - Bun global exists at runtime
     if (typeof Bun !== "undefined" && Bun.password?.hash) {
-      // @ts-expect-error
       return await Bun.password.hash(password);
     }
   } catch { /* fall through */ }
@@ -81,9 +92,7 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   try {
-    // @ts-expect-error
     if (typeof Bun !== "undefined" && Bun.password?.verify) {
-      // @ts-expect-error
       return await Bun.password.verify(password, hash);
     }
   } catch { /* fall through */ }
