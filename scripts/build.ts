@@ -6,23 +6,11 @@ const outdir = join(import.meta.dir, "..", "dist");
 const entry = join(import.meta.dir, "..", "apps", "cli", "index.ts");
 
 const targets = [
-  // NOTE: UPX compression corrupts `bun build --compile` output on this
-  // project (the binary crashes at startup with
-  // `SyntaxError: Invalid character: '\0'`). Disabled until proven safe.
-  // Size cost is ~2x (40MB -> 80MB) but correctness comes first.
-  { name: "share0-linux-x64", target: "bun-linux-x64", upx: false },
-  { name: "share0-darwin-x64", target: "bun-darwin-x64", upx: false },
-  { name: "share0-darwin-arm64", target: "bun-darwin-arm64", upx: false },
-  { name: "share0-windows-x64.exe", target: "bun-windows-x64", upx: false },
+  { name: "share0-linux-x64", target: "bun-linux-x64" },
+  { name: "share0-darwin-x64", target: "bun-darwin-x64" },
+  { name: "share0-darwin-arm64", target: "bun-darwin-arm64" },
+  { name: "share0-windows-x64.exe", target: "bun-windows-x64" },
 ];
-
-let hasUpx = false;
-try {
-  await $`upx --version`.quiet();
-  hasUpx = true;
-} catch {
-  console.log("UPX not found — skipping compression. Install with: sudo apt install upx-ucl / brew install upx\n");
-}
 
 await mkdir(outdir, { recursive: true });
 
@@ -43,22 +31,15 @@ const version = (JSON.parse(await Bun.file(join(import.meta.dir, "..", "package.
 const defineKV = `process.env.SHARE0_VERSION=${JSON.stringify(version)}`;
 console.log(`Version ${version}\n`);
 
-for (const { name, target, upx } of targets) {
+for (const { name, target } of targets) {
   const outfile = join(outdir, name);
   console.log(`  ${target} -> ${name}`);
 
   try {
     await $`bun build --compile --target ${target} --define ${defineKV} ${entry} --outfile ${outfile}`;
 
-    const sizeBefore = (await stat(outfile)).size;
-    console.log(`    built  ${formatSize(sizeBefore)}`);
-
-    if (hasUpx && upx) {
-      await $`upx -1 --quiet ${outfile}`;
-      const sizeAfter = (await stat(outfile)).size;
-      const saved = ((1 - sizeAfter / sizeBefore) * 100).toFixed(0);
-      console.log(`    upx    ${formatSize(sizeAfter)} (-${saved}%)`);
-    }
+    const size = (await stat(outfile)).size;
+    console.log(`    built  ${formatSize(size)}`);
 
     const proc = await $`sha256sum ${outfile}`.text();
     const hash = proc.split(" ")[0];
