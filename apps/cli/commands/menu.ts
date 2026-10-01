@@ -1,9 +1,9 @@
-import { header, select, textInput, confirm, dim, bold } from "@share/ui";
+import { header, select, textInput, confirm, dim, bold, cyan, gray2 } from "@share/ui";
 import { existsSync } from "node:fs";
 
 export async function runMenu(): Promise<void> {
   console.log(header());
-  console.log(dim("Send files without uploading. LAN-first, public when you need it.\n"));
+  console.log(gray2("Send files without uploading. LAN-first, public when you need it.\n"));
 
   const choice = await select("What do you want to do?", [
     { value: "send", label: "Send files…", hint: "share a file or folder" },
@@ -111,7 +111,7 @@ export async function runMenu(): Promise<void> {
   }
   if (choice === "list") {
     const { runList } = await import("./list.ts");
-    runList();
+    await runList();
     return;
   }
   const { runDoctor } = await import("./doctor.ts");
@@ -128,17 +128,17 @@ function hubHint(): string {
 export function printPrettyHelp(): void {
   console.log(header());
   console.log("");
-  console.log(`${bold("Usage:")}  share0 <command> [options]`);
-  console.log(`${bold("         ")}  share0  (no args → interactive menu)`);
+  console.log(`${bold("Usage:")}  ${cyan("share0")} <command> [options]`);
+  console.log(`${bold("         ")}  ${cyan("share0")}  (no args → interactive menu)`);
   console.log("");
   console.log(bold("Commands:"));
-  console.log("  send <paths…>   Share files / directories");
-  console.log("  receive         Open an upload inbox");
-  console.log("  hub             Run a hub (name → live URL lookup)");
-  console.log("  discover        Find nearby LAN shares");
-  console.log("  list            List active shares");
-  console.log("  stop <id>       Stop a share");
-  console.log("  doctor          Diagnose network + tunnels");
+  console.log(`  ${cyan("send")} <paths…>   Share files / directories`);
+  console.log(`  ${cyan("receive")}         Open an upload inbox`);
+  console.log(`  ${cyan("hub")}             Run a hub (name → live URL lookup)`);
+  console.log(`  ${cyan("discover")}        Find nearby LAN shares`);
+  console.log(`  ${cyan("list")}            List active shares`);
+  console.log(`  ${cyan("stop")} <id>       Stop a share`);
+  console.log(`  ${cyan("doctor")}          Diagnose network + tunnels`);
   console.log("");
   console.log(bold("Examples:"));
   console.log("  share0 send ./photo.jpg");

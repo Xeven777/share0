@@ -113,7 +113,7 @@ cli
     await runDiscover({ timeout: options.timeout != null ? Number(options.timeout) : undefined });
   });
 
-cli.command("list", "List active shares").action(() => runList());
+cli.command("list", "List active shares").action(async () => { await runList(); });
 
 cli
   .command("stop <id>", "Stop a share")

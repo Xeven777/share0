@@ -40,18 +40,21 @@ export async function maybeDetachParent(): Promise<boolean> {
     env: process.env,
   });
   child.unref();
-  console.log(`Share starting in background (pid ${child.pid}). Log: ${log}`);
+  const { green, cyan, gray2 } = await import("@share/ui");
+  console.log(`${green("✓")} Share starting in background (pid ${child.pid}).`);
+  console.log(`  ${gray2("Log:")} ${cyan(log)}`);
   const ready = await waitForReady(log);
   let content = "";
   try { content = readFileSync(log, "utf8"); } catch { /* noop */ }
   // Re-print the child's output (URLs, QR) now that they're final.
   console.log(content);
   if (!ready) {
-    console.error(`\nShare did not become ready in time. See log: ${log}`);
+    const { red } = await import("@share/ui");
+    console.error(`\n${red("Share did not become ready in time.")} See log: ${log}`);
     console.error(`Stop it with: share stop <id> (see log for the id)`);
     process.exit(1);
   }
-  console.log(`Running in background. Stop with: share stop <id>`);
+  console.log(`${green("✓")} ${gray2(`Running in background. Stop with: share stop <id>`)}`);
   return true;
 }
 

@@ -1,7 +1,7 @@
 // Minimal raw-stdin prompts. No dependencies, TTY-only.
 // Arrow keys + enter for select, y/n for confirm, free text for input.
 
-import { dim } from "./theme.ts";
+import { SYMBOLS, accent, bold, dim, gray2 } from "./theme.ts";
 
 export interface SelectChoice<T extends string = string> {
   value: T;
@@ -32,11 +32,13 @@ export async function select<T extends string>(message: string, choices: SelectC
   if (!process.stdin.isTTY || !process.stdout.isTTY) return choices[0]!.value;
   let idx = 0;
   const render = () => {
-    const lines = [`◆ ${message}`];
+    const lines = [`${accent(SYMBOLS.logo)} ${bold(message)}`];
     choices.forEach((c, i) => {
-      const cursor = i === idx ? "❯" : " ";
-      const label = i === idx ? c.label : dim(c.label);
-      lines.push(`${cursor} ${label}${c.hint ? dim(`  ${c.hint}`) : ""}`);
+      // The cursor and the live row carry the accent; the rest stays dim, so a
+      // glance tells you where "enter" will land.
+      const cursor = i === idx ? accent("❯") : " ";
+      const label = i === idx ? bold(c.label) : dim(c.label);
+      lines.push(`${cursor} ${label}${c.hint ? (i === idx ? `  ${c.hint}` : `  ${gray2(c.hint)}`) : ""}`);
     });
     lines.push(dim("↑↓ navigate · enter select · ctrl+c cancel"));
     process.stdout.write("\x1b[2J\x1b[H" + lines.join("\n") + "\n");
@@ -75,7 +77,7 @@ export async function select<T extends string>(message: string, choices: SelectC
 export async function confirm(message: string, defaultYes = false): Promise<boolean> {
   if (!process.stdin.isTTY) return defaultYes;
   const hint = defaultYes ? "[Y/n]" : "[y/N]";
-  process.stdout.write(`◆ ${message} ${dim(hint)} `);
+  process.stdout.write(`${accent(SYMBOLS.logo)} ${bold(message)} ${dim(hint)} `);
   return new Promise((resolve) => {
     const stdin = process.stdin;
     stdin.resume();
@@ -96,7 +98,7 @@ export async function textInput(message: string, placeholder = ""): Promise<stri
   const rl = await import("node:readline");
   const iface = rl.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    iface.question(`◆ ${message}${placeholder ? dim(` (${placeholder})`) : ""}: `, (ans) => {
+    iface.question(`${accent(SYMBOLS.logo)} ${bold(message)}${gray2(placeholder ? ` (${placeholder})` : "")}: `, (ans) => {
       iface.close();
       resolve(ans.trim());
     });

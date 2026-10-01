@@ -13,12 +13,15 @@ export function staleNetworkCandidates(record: ShareRecord, currentIps: string[]
   return currentIps.map((ip) => `http://${ip}:${record.port}/s/${record.id}/`);
 }
 
-export function runList(): void {
+export async function runList(): Promise<void> {
+  const ui = await import("@share/ui");
   const records = loadRecords();
   if (!records.length) {
-    console.log("No active shares.");
+    console.log(ui.gray2("No active shares."));
     return;
   }
+  console.log(ui.header("share0 list"));
+  console.log("");
   const rows = records.map((r) => ({
     ID: r.id,
     NAME: r.name,
@@ -36,9 +39,10 @@ export function runList(): void {
   for (const r of records) {
     const candidates = staleNetworkCandidates(r, currentIps);
     if (candidates) {
-      console.log(`\n⚠ ${r.id}: network changed since share started (stored URL is stale).`);
-      console.log(`  The share is still running — try these current addresses:`);
-      for (const u of candidates) console.log(`    ${u}`);
+      const { warnLine, cyan, gray2 } = await import("@share/ui");
+      console.log(warnLine(`${r.id}: network changed since share started (stored URL is stale).`));
+      console.log(`  ${gray2("The share is still running — try these current addresses:")}`);
+      for (const u of candidates) console.log(`    ${cyan(u)}`);
     }
   }
 }

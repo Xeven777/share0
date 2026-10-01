@@ -54,6 +54,7 @@ async function dirSize(dir: string): Promise<number> {
 
 export async function runSend(pathsIn: string[] | string, flags: SendFlags): Promise<void> {
   const paths = Array.isArray(pathsIn) ? pathsIn : [pathsIn];
+  const uiEarly = await import("@share/ui");
   if (!paths.length) {
     console.error("Usage: share0 send <file|dir> [more...] [options]");
     process.exit(1);
@@ -106,17 +107,17 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
       // receiver refreshes it every 10, so a tunnel that died in between still
       // resolves. Probing turns that into a clear message instead of a push
       // that hangs until it times out.
-      console.log(`  → ${found.label ?? found.name} is online. Checking…`);
+      console.log(`  ${uiEarly.accent("→")} ${uiEarly.bold(found.label ?? found.name)} is online. Checking…`);
       if (!(await inboxAnswers(endpoint))) {
         console.error(
-          `"${name}" points at ${found.url}, but that inbox is not answering.\n` +
+          `"${name}" points at ${uiEarly.cyan(found.url)}, but that inbox is not answering.\n` +
             `  Their tunnel is probably down. Ask them to run:\n` +
-            `    share0 receive --as ${name}\n` +
-            `  or push straight to the URL while it is still up.`
+            `    ${uiEarly.gray2("share0 receive --as " + name)}\n` +
+            `  Or push straight to the URL while it is still up.`
         );
         process.exit(1);
       }
-      console.log(`  → inbox answered. Sending…`);
+      console.log(`  ${uiEarly.accent("→")} inbox answered. Sending…`);
     } else if (!/^https?:\/\//i.test(endpoint)) {
       endpoint = `http://${endpoint}`;
     }
@@ -136,7 +137,7 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
       if (statSync(p).isDirectory()) {
         const zipPath = join(tmpdir(), `share-push-${nanoid(4)}.zip`);
         const pw = typeof flags.password === "string" ? flags.password : undefined;
-        console.log(`Archiving ${basename(p)}…`);
+        console.log(`Archiving ${uiEarly.bold(basename(p))}…`);
         await createZip([p], zipPath, pw);
         toSend.push(zipPath);
       } else {
@@ -145,12 +146,12 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
     }
 
     const pw = typeof flags.password === "string" ? flags.password : undefined;
-    console.log(`Pushing ${toSend.length} file(s) to ${endpoint}…`);
+    console.log(`Pushing ${uiEarly.bold(String(toSend.length))} file(s) to ${uiEarly.cyan(endpoint)}…`);
     const done = await pushFiles(endpoint, toSend, {
       password: pw,
-      onProgress: (f, b) => console.log(`  ✓ ${f} (${formatBytes(b)})`),
+      onProgress: (f, b) => console.log(`  ${uiEarly.green("✓")} ${f} (${uiEarly.gray1(formatBytes(b))})`),
     });
-    console.log(`Delivered ${done.length} file(s).`);
+    console.log(`Delivered ${uiEarly.bold(String(done.length))} file(s).`);
     return;
   }
   const abs = paths.map((p) => resolve(p));
@@ -192,7 +193,6 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
   let zipPath: string | undefined;
   let serveName: string;
   let source: ShareSession["source"];
-  const uiEarly = await import("@share/ui");
   if (flags.zip) {
     const id = nanoid(4);
     const base = multi ? "share" : basename(abs[0]);
@@ -202,12 +202,12 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
     const zipTicker = animateZip
       ? uiEarly.startLiveLine((t) => `Creating archive ${serveName} ${uiEarly.frameAt(uiEarly.SPINNER, t)}`)
       : null;
-    if (!animateZip) console.log(`Creating archive ${serveName}…`);
+    if (!animateZip) console.log(`Creating archive ${uiEarly.bold(serveName)}…`);
     await createZip(abs, zipPath, zipPassword);
     size = statSync(zipPath).size;
     if (zipTicker) {
       zipTicker.stop();
-      console.log(`Archive ready: ${serveName} (${formatBytes(size)})`);
+      console.log(`Archive ready: ${uiEarly.bold(serveName)} (${uiEarly.gray1(formatBytes(size))})`);
     }
     source = { type: "file", path: zipPath };
   } else if (!multi && !isDir) {
@@ -255,14 +255,13 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
   const jsonMode = !!flags.json;
 
   // --- interactive scope + tunnel picker (TTY only) ---
-  const ui = await import("@share/ui");
-  const interactive = ui.isInteractive({ yes: flags.yes, quiet: flags.quiet, json: flags.json });
+  const interactive = uiEarly.isInteractive({ yes: flags.yes, quiet: flags.quiet, json: flags.json });
   let wantPublic = !!flags.public;
   let tunnelOpt = flags.tunnel;
   const tunnelLower = tunnelOpt?.toLowerCase();
   if (tunnelOpt && tunnelLower !== "auto" && tunnelLower !== "ask") wantPublic = true;
   if (interactive && !wantPublic && !tunnelOpt && !flags.to) {
-    wantPublic = await ui.confirm("Expose publicly via tunnel? (LAN-only otherwise)", false);
+    wantPublic = await uiEarly.confirm("Expose publicly via tunnel? (LAN-only otherwise)", false);
   }
   if (wantPublic && (!tunnelOpt || tunnelLower === "ask") && interactive) {
     const { detectTunnels } = await import("@share/transport");
@@ -282,7 +281,7 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
       }
     };
     if (ready.length > 1) {
-      const pick = await ui.select("Which tunnel provider?", [
+      const pick = await uiEarly.select("Which tunnel provider?", [
         { value: "__auto__", label: "Auto (recommended)", hint: "pick fastest healthy" },
         ...candidates.map((c) => ({
           value: c.name,
@@ -292,10 +291,10 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
       ]);
       tunnelOpt = pick === "__auto__" ? undefined : pick;
     } else if (ready.length === 1) {
-      console.log(`\n${ui.dim(`Only ${ready[0]!.name} is available — using it.`)}`);
+      console.log(`\n${uiEarly.dim(`Only ${ready[0]!.name} is available — using it.`)}`);
       tunnelOpt = ready[0]!.name;
     } else {
-      console.log(ui.warnLine("No tunnel provider available — sharing LAN-only."));
+      console.log(uiEarly.warnLine("No tunnel provider available — sharing LAN-only."));
       wantPublic = false;
       tunnelOpt = undefined;
     }
@@ -311,11 +310,12 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
 
   // --- transports (LAN → IPv6 → UPnP → WebRTC → tunnel) ---
   if (!quiet && !jsonMode) {
-    console.log(ui.header());
-    console.log(`  ${ui.bold("File")}  ${serveName}  ${ui.dim(formatBytes(size))}`);
+    console.log(uiEarly.header());
+    console.log(uiEarly.kv("File", `${uiEarly.bold(serveName)}`));
+    console.log(uiEarly.kv("Size", uiEarly.gray1(formatBytes(size))));
   }
   const logFn = quiet || jsonMode ? () => {} : (m: string) => console.log(m);
-  if (!quiet && !jsonMode) console.log(ui.sectionLabel("Connectivity"));
+  if (!quiet && !jsonMode) console.log(uiEarly.sectionLabel("Connectivity"));
   let sel;
   try {
     sel = await selectTransports(
@@ -341,7 +341,7 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
     process.exit(1);
   }
   if (!quiet && !jsonMode) {
-    for (const n of sel.notes) console.log(`  ${ui.dim("· " + n)}`);
+    for (const n of sel.notes) console.log(`  ${uiEarly.gray3("·")} ${uiEarly.gray2(n)}`);
   }
 
   // Host firewall blocks phone→laptop LAN traffic while loopback still works
@@ -350,12 +350,12 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
     const { detectBlockingFirewall, p2pUdpFix } = await import("@share/discovery");
     const fw = await detectBlockingFirewall(port);
     if (fw.active && !quiet && !jsonMode) {
-      console.log(ui.warnLine(`Host firewall (${fw.tool}) is ACTIVE — phones on Wi-Fi CANNOT reach the LAN URL.`));
-      console.log(`  Fix (one command, stays working for future shares):`);
-      console.log(`    ${fw.fix}`);
+      console.log(uiEarly.warnLine(`Host firewall (${fw.tool}) is ACTIVE — phones on Wi-Fi CANNOT reach the LAN URL.`));
+      console.log(`  ${uiEarly.gray2("Fix (one command, stays working for future shares):")}`);
+      console.log(`    ${uiEarly.accent(fw.fix ?? "")}`);
       if (fw.tool) {
-        console.log(`  For direct P2P (WebRTC/UDP) also allow:`);
-        console.log(`    ${p2pUdpFix(fw.tool)}`);
+        console.log(`  ${uiEarly.gray2("For direct P2P (WebRTC/UDP) also allow:")}`);
+        console.log(`    ${uiEarly.accent(p2pUdpFix(fw.tool as "ufw" | "firewalld"))}`);
       }
     }
   } catch { /* noop */ }
@@ -381,47 +381,50 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
     console.log(primaryLocal);
     if (primaryPublic) console.log(primaryPublic);
   } else {
-    console.log(`\nSelected transport: ${sel.public.length ? "tunnel (" + sel.public[0]!.label + ")" : "LAN"}`);
-    console.log(ui.sectionLabel("Local"));
-    console.log(`  ${ui.cyan(primaryLocal)}`);
+    const transportLabel = sel.public.length
+      ? `tunnel (${sel.public[0]!.label})`
+      : "LAN";
+    console.log(uiEarly.kv("Transport", `${transportLabel} ${uiEarly.badge(sel.public.length ? "PUBLIC" : "LOCAL", sel.public.length ? "ok" : "muted")}`));
+    console.log(uiEarly.sectionLabel("Local"));
+    console.log(`  ${uiEarly.bold(uiEarly.cyan(primaryLocal))}`);
     for (const ep of sel.local.slice(1)) {
       // P2P endpoints already carry the full share URL.
-      if (ep.kind === "p2p") console.log(ui.sectionLabel("Direct P2P"), `\n  ${ui.cyan(ep.url)}`);
-      else console.log(`  ${ui.dim(`${ep.url}/s/${id}/`)}  ${ui.dim(`(${ep.label})`)}`);
+      if (ep.kind === "p2p") console.log(uiEarly.sectionLabel("Direct P2P"), `\n  ${uiEarly.bold(uiEarly.cyan(ep.url))}`);
+      else console.log(`  ${uiEarly.gray1(`${ep.url}/s/${id}/`)}  ${uiEarly.badge(ep.label, "muted")}`);
     }
     if (sel.public.length) {
-      console.log(ui.sectionLabel("Public"));
-      for (const ep of sel.public) console.log(`  ${ui.cyan(shareUrl(ep.url))}  ${ui.dim(`(via ${ep.label})`)}`);
+      console.log(uiEarly.sectionLabel("Public"));
+      for (const ep of sel.public) console.log(`  ${uiEarly.bold(uiEarly.cyan(shareUrl(ep.url)))}  ${uiEarly.badge("via " + ep.label, "accent")}`);
       if (sel.public.some((ep) => /pinggy/i.test(ep.label))) {
-        console.log(`\nNote: free pinggy links show a one-time Pinggy caution page.`);
-        console.log("Tell the recipient to tap “Enter site” to reach your files.");
+        console.log(`\n${uiEarly.yellow("Note: free pinggy links show a one-time Pinggy caution page.")}`);
+        console.log(uiEarly.gray2("Tell the recipient to tap “Enter site” to reach your files."));
       }
     }
-    if (passwordRaw) console.log(`\nPassword: ${ui.bold(passwordRaw)}`);
-    console.log(`\nDownloads: 0${session.maxDownloads ? ` / ${session.maxDownloads}` : ""}`);
-    console.log(`Expires: ${session.expiresAt ? new Date(session.expiresAt).toLocaleString() : "when stopped"}`);
+    if (passwordRaw) console.log(`\n${uiEarly.kv("Password", uiEarly.badge(passwordRaw, "warn"))}`);
+    console.log(uiEarly.kv("Downloads", `0${session.maxDownloads ? ` / ${session.maxDownloads}` : ""}`));
+    console.log(uiEarly.kv("Expires", session.expiresAt ? new Date(session.expiresAt).toLocaleString() : "when stopped"));
 
     // QR — Local + Public by default; --qr controls scope.
     const qrMode = (flags.qr ?? "smart").toLowerCase();
     const showQr = qrMode !== "off";
     if (showQr) {
       const narrow = (process.stdout.columns ?? 80) < 70;
-      await ui.printQR("QR · Local — scan on same Wi-Fi", primaryLocal);
+      await uiEarly.printQR("QR · Local — scan on same Wi-Fi", primaryLocal);
       if (primaryPublic && qrMode !== "local") {
-        await ui.printQR("QR · Public — scan from anywhere", primaryPublic);
+        await uiEarly.printQR("QR · Public — scan from anywhere", primaryPublic);
       }
       if (qrMode === "all" && p2pUrl && !narrow) {
-        await ui.printQR("QR · Direct P2P", p2pUrl);
+        await uiEarly.printQR("QR · Direct P2P", p2pUrl);
       } else if (p2pUrl && qrMode === "all" && narrow) {
-        console.log(ui.sectionLabel("Direct P2P (QR skipped — narrow terminal)"));
-        console.log(`  ${ui.cyan(p2pUrl)}`);
+        console.log(uiEarly.sectionLabel("Direct P2P (QR skipped — narrow terminal)"));
+        console.log(`  ${uiEarly.cyan(p2pUrl)}`);
       }
     }
 
     // Clipboard — prefer public URL when shared publicly.
     if (!flags.noClipboard) {
       const toCopy = primaryPublic ?? primaryLocal;
-      const ok = await ui.copyToClipboard(toCopy);
+      const ok = await uiEarly.copyToClipboard(toCopy);
       console.log(ok ? `\nCopied ${primaryPublic ? "public" : "local"} URL to clipboard.` : "\n(Clipboard copy unavailable.)");
     }
   }
@@ -456,8 +459,8 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
       const cur = new Set(getLanInfo().ipv4);
       const same = cur.size === lastIps.size && [...cur].every((ip) => lastIps.has(ip));
       if (!same) {
-        console.log("\n⚠ Network changed. The share is still running — current addresses:");
-        for (const ip of cur) console.log(`  http://${ip}:${port}/s/${id}/`);
+        console.log(uiEarly.warnLine("Network changed. The share is still running — current addresses:"));
+        for (const ip of cur) console.log(`  ${uiEarly.cyan(`http://${ip}:${port}/s/${id}/`)}`);
         lastIps = cur;
       }
     }, 15000);
@@ -466,22 +469,22 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
 
   console.log("\nPress Ctrl+C to stop.");
 
-  // Live waiting line: spinner + download count + elapsed. Reads
-  // session.downloads on every frame so it stays current for free.
+  // Live waiting line: colored spinner + download count + elapsed.
+  // Reads session.downloads on every frame so it stays current for free.
   let stopWaiting: (() => void) | null = null;
-  if (!quiet && !jsonMode && ui.canAnimate()) {
-    stopWaiting = ui.startLiveLine((t) => {
+  if (!quiet && !jsonMode && uiEarly.canAnimate()) {
+    stopWaiting = uiEarly.startLiveLine((t) => {
       const n = session.downloads;
-      return ui.dim(
-        `Waiting for recipient ${ui.frameAt(ui.SPINNER, t)} · ` +
-          `${n} download${n === 1 ? "" : "s"} · ${ui.formatElapsed(t)}`
+      return uiEarly.dim(
+        `Waiting for recipient ${uiEarly.frameAt(uiEarly.SPINNER, t)} · ` +
+          `${uiEarly.bold(String(n))} download${n === 1 ? "" : "s"} · ${uiEarly.gray1(uiEarly.formatElapsed(t))}`
       );
     }).stop;
   }
 
   const cleanup = async () => {
     stopWaiting?.();
-    console.log("\nStopping share…");
+    console.log(`\n${uiEarly.yellow("Stopping share…")}`);
     for (const t of sel.opened) {
       try { await t.close(); } catch { /* noop */ }
     }

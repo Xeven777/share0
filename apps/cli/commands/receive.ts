@@ -31,6 +31,7 @@ export interface ReceiveFlags {
 export async function runReceive(flags: ReceiveFlags): Promise<void> {
   const dir = resolve(flags.dir ?? "./share-inbox");
   const port = flags.port ?? 8788;
+  const ui = await import("@share/ui");
 
   let passwordRaw: string | undefined;
   let passwordHash: string | undefined;
@@ -45,7 +46,7 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
   const handler = createReceiveHandler({
     dir,
     passwordHash,
-    onReceive: (name, bytes) => console.log(`  ✓ received ${name} (${formatBytes(bytes)}) → ${dir}`),
+    onReceive: (name, bytes) => console.log(`  ${ui.green("✓")} received ${name} (${ui.gray1(formatBytes(bytes))}) → ${dir}`),
   });
 
   let actualPort = port;
@@ -69,14 +70,13 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
   let stopAdvertise: (() => void) | null = null;
   try {
     stopAdvertise = await advertise({ kind: "receive", id: `inbox-${actualPort}`, name: `inbox on ${lan}`, port: actualPort });
-    console.log("  · advertised on LAN via mDNS (share0 discover)");
+    console.log(`  ${ui.gray3("·")} ${ui.gray2("advertised on LAN via mDNS (share0 discover)")}`);
   } catch { /* mDNS unavailable */ }
 
   // --- tunnel (--public) ---
   // A LAN-only inbox is unreachable from another network, which is the whole
   // point of sharing with someone far away. Reuse the same provider selection
   // `send` uses, so both directions fail and fall back identically.
-  const ui = await import("@share/ui");
   const quiet = !!flags.quiet;
   const interactive = ui.isInteractive({ yes: flags.yes, quiet, json: flags.json });
   let wantPublic = !!flags.public;
@@ -96,7 +96,7 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
       ]);
       tunnelOpt = pick === "__auto__" ? undefined : pick;
     } else if (ready.length === 1) {
-      console.log(`\n${ui.dim(`Only ${ready[0]!.name} is available — using it.`)}`);
+      console.log(`\n${ui.gray2(`Only ${ready[0]!.name} is available — using it.`)}`);
       tunnelOpt = ready[0]!.name;
     } else {
       console.log(ui.warnLine("No tunnel provider available — inbox stays LAN-only."));
@@ -119,7 +119,7 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
       preferredTunnel: tunnelOpt,
       onLog: quiet ? () => {} : (m) => console.log(m),
     });
-    for (const n of t.notes) if (!quiet) console.log(`  ${ui.dim("· " + n)}`);
+    for (const n of t.notes) if (!quiet) console.log(`  ${ui.gray3("·")} ${ui.gray2(n)}`);
     opened = t.opened;
     if (t.url) {
       tunnelUrl = t.url;
@@ -160,7 +160,7 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
         try {
           await announce(base, input);
           stopHeartbeat = startHeartbeat(base, input, {
-            onError: (e) => console.log(`  ${ui.dim("· hub: " + e.message)}`),
+            onError: (e) => console.log(`  ${ui.gray3("·")} ${ui.gray2("hub: " + e.message)}`),
           });
           published = { name: wantName, kind };
         } catch (e) {
@@ -172,42 +172,41 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
   }
 
   console.log(ui.header("share0 receive"));
-  console.log(`\n  Saving to  ${dir}`);
+  console.log(`\n${ui.kv("Saving to", ui.bold(dir))}`);
   console.log(ui.sectionLabel("Upload URL"));
-  console.log(`  ${ui.cyan(url)}`);
+  console.log(`  ${ui.bold(ui.cyan(url))}`);
   if (tunnelUrl) {
     console.log(ui.sectionLabel("Public"));
-    console.log(`  ${ui.cyan(tunnelUrl)}  ${ui.dim(`(via ${tunnelLabel})`)}`);
+    console.log(`  ${ui.bold(ui.cyan(tunnelUrl))}  ${ui.badge("via " + tunnelLabel, "accent")}`);
   }
-  if (passwordRaw) console.log(`\n  Password   ${ui.bold(passwordRaw)}`);
+  if (passwordRaw) console.log(`\n${ui.kv("Password", ui.badge(passwordRaw, "warn"))}`);
   if (published) {
     console.log(ui.sectionLabel("Send to this inbox"));
     console.log(`  ${ui.bold(ui.cyan(`share0 send ./file --to ${published.name}`))}`);
     if (published.kind === "code") {
-      console.log(`  ${ui.dim("Temporary code — expires when you stop.")}`);
+      console.log(`  ${ui.gray2("Temporary code — expires when you stop.")}`);
     } else {
-      console.log(`  ${ui.dim("This name keeps working every time you run this command.")}`);
+      console.log(`  ${ui.gray2("This name keeps working every time you run this command.")}`);
     }
   } else {
-    console.log(`\n  Push from another device:\n    share0 send ./file --to ${tunnelUrl ?? url}`);
+    console.log(`\n  ${ui.gray2("Push from another device:")}\n    ${ui.cyan(`share0 send ./file --to ${tunnelUrl ?? url}`)}`);
   }
-  console.log(`\n  Press Ctrl+C to stop`);
+  console.log(`\n  ${ui.gray2("Press Ctrl+C to stop")}`);
 
   await ui.printQR("QR · Scan to open inbox", tunnelUrl ?? url);
   if (await ui.copyToClipboard(tunnelUrl ?? url)) console.log("\nCopied URL to clipboard.");
-
   if (flags.expires) {
     const { parseExpires } = await import("@share/core");
     const ms = parseExpires(flags.expires);
     const expireTimer = setTimeout(() => {
-      console.log("\nReceive window expired.");
+      console.log(ui.warnLine("Receive window expired."));
       void cleanup();
     }, ms);
     expireTimer.unref?.();
   }
 
   const cleanup = async () => {
-    console.log("\nStopping receiver…");
+    console.log(`\n${ui.yellow("Stopping receiver…")}`);
     try { stopAdvertise?.(); } catch { /* noop */ }
     // Stop refreshing first, then retract the name: a clean exit should not
     // leave a name resolving to a machine that is about to be gone.
@@ -217,7 +216,7 @@ export async function runReceive(flags: ReceiveFlags): Promise<void> {
         const { hubUrl, retract } = await import("@share/hub");
         const base = flags.hub ?? hubUrl();
         if (base) await retract(base, published.name, published.kind);
-        console.log(`  name "${published.name}" is no longer published.`);
+        console.log(`  name ${ui.bold(`"${published.name}"`)} is no longer published.`);
       } catch { /* best effort — the TTL is the real guarantee */ }
     }
     // Close the tunnel before the server: a leftover adapter process would

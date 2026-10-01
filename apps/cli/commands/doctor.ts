@@ -18,6 +18,7 @@ async function portFree(port: number): Promise<boolean> {
 }
 
 export async function runDoctor(): Promise<void> {
+  const ui = await import("@share/ui");
   const checks: Array<[string, () => Promise<{ ok: boolean; detail?: string }>]> = [
     ["Runtime", async () => ({ ok: true, detail: `Bun ${Bun.version}` })],
     ["Network interface", async () => {
@@ -108,13 +109,13 @@ export async function runDoctor(): Promise<void> {
   for (const [name, fn] of checks) {
     try {
       const r = await fn();
-      console.log(`${r.ok ? "✓" : "✗"} ${name}${r.detail ? ` — ${r.detail}` : ""}`);
-      if (!r.ok) failed++;
+      if (r.ok) console.log(ui.okLine(name, r.detail ?? ""));
+      else { failed++; console.log(`  ${ui.red(ui.SYMBOLS.fail)} ${name}${r.detail ? ui.gray2(` — ${r.detail}`) : ""}`); }
     } catch (e) {
       failed++;
-      console.log(`✗ ${name} — ${(e as Error).message}`);
+      console.log(`  ${ui.red(ui.SYMBOLS.fail)} ${name}${ui.gray2(` — ${(e as Error).message}`)}`);
     }
   }
-  if (failed) console.log(`\n${failed} check(s) need attention. LAN sharing works regardless.`);
-  else console.log("\nAll checks passed.");
+  if (failed) console.log(`\n${ui.yellow(`${failed} check(s) need attention. LAN sharing works regardless.`)}`);
+  else console.log(`\n${ui.green(ui.bold("All checks passed."))}`);
 }
