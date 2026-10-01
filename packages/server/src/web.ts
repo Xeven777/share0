@@ -212,6 +212,7 @@ pre { padding: 12px; font-size: 13px; line-height: 1.6; overflow: auto; white-sp
 <script>
 const SHARE_ID = ${JSON.stringify(shareId)};
 let password = sessionStorage.getItem("share-pw-" + SHARE_ID) || "";
+let downloadQueue = []; // files the primary button fetches, in order (set by load)
 const q = () => (password ? "?password=" + encodeURIComponent(password) : "");
 async function api(path) {
   const r = await fetch("/s/" + SHARE_ID + path + q(), { headers: password ? { "x-share-password": password } : {} });
@@ -254,6 +255,7 @@ async function load() {
   document.getElementById("meta").textContent = fmtBytes(meta.size) + (meta.isDirectory ? " · Folder" : "");
   document.getElementById("fileicon").textContent = labelFor(meta.mime || "", meta.name);
   const dl = document.getElementById("download");
+  downloadQueue = []; // rebuilt below; single-file shares leave it empty
   dl.href = "/s/" + SHARE_ID + "/download/" + encodeURIComponent(meta.name) + q();
   dl.download = meta.name;
   if (meta.expiresAt) {
@@ -273,9 +275,12 @@ async function load() {
       list.hidden = false;
       list.innerHTML = "";
       for (const f of files) {
+        const href = "/s/" + SHARE_ID + "/download/" + f.path + q();
+        const name = decodeURIComponent(f.path).split("/").pop();
+        downloadQueue.push({ href, name });
         const a = document.createElement("a");
-        a.href = "/s/" + SHARE_ID + "/download/" + f.path + q();
-        a.download = decodeURIComponent(f.path).split("/").pop();
+        a.href = href;
+        a.download = name;
         const icon = document.createElement("span"); icon.className = "fi"; icon.setAttribute("aria-hidden", "true"); icon.textContent = labelFor(f.mime || "", f.path);
         const l = document.createElement("span"); l.className = "fname"; l.textContent = decodeURIComponent(f.path);
         const r = document.createElement("span"); r.textContent = fmtBytes(f.size);
@@ -284,8 +289,16 @@ async function load() {
       const all = document.getElementById("download-all");
       all.hidden = false;
       all.href = "/s/" + SHARE_ID + "/download-all" + q();
-      dl.textContent = files.length === 1 ? "Download" : "Download first file";
-      if (files.length > 1) dl.href = "/s/" + SHARE_ID + "/download/" + files[0].path + q();
+      if (files.length) {
+        // One click fetches every file (the download handler walks the queue).
+        // meta.name is "folder/" — a URL that serves no file and a bad name.
+        dl.hidden = false;
+        dl.textContent = files.length === 1 ? "Download" : "Download all (" + files.length + ")";
+        dl.href = downloadQueue[0].href;
+        dl.download = downloadQueue[0].name;
+      } else {
+        dl.hidden = true; // empty folder — only "Download all" applies
+      }
     } else if (files.length === 1) {
       renderPreview(files[0]);
     }
@@ -342,38 +355,57 @@ document.getElementById("copyLink").onclick = async (e) => {
   }
   setTimeout(() => { btn.textContent = "Copy link"; }, 2000);
 };
-// Download with progress bar (falls back to plain navigation on failure).
+// Save a URL as a file (object URL or same-origin download), without navigating.
+function clickAnchor(href, name) {
+  const a = document.createElement("a");
+  a.href = href; a.download = name || "";
+  document.body.append(a); a.click(); a.remove();
+}
+// Download the queued files one after another (a folder share is "one click,
+// everything"). Small files stream through a blob so the progress bar moves;
+// large/unknown ones are handed to the browser so they stream straight to disk
+// instead of being buffered in memory — and, being same-origin, they don't
+// navigate away, so the remaining files still fire.
 document.getElementById("download").addEventListener("click", async (e) => {
   const a = e.currentTarget;
-  if (a.dataset.direct === "1") return; // second click = plain download
-  if (!a.href) return;
+  if (a.dataset.busy === "1") return; // ignore clicks mid-batch
+  const items = downloadQueue.length ? downloadQueue : (a.href ? [{ href: a.href, name: a.download || "download" }] : []);
+  if (!items.length) return;
   e.preventDefault();
+  const label = a.textContent;
   const bar = document.getElementById("dlbar"), fill = document.getElementById("dlfill");
-  try {
-    bar.hidden = false; fill.style.width = "2%";
-    const r = await fetch(a.href);
-    if (!r.ok || !r.body) throw new Error("fetch failed");
-    const total = Number(r.headers.get("content-length") || 0);
-    const reader = r.body.getReader();
-    const chunks = []; let got = 0;
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value); got += value.length;
-      if (total) fill.style.width = Math.min(100, Math.round(100 * got / total)) + "%";
+  a.dataset.busy = "1";
+  bar.hidden = false;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    fill.style.width = "0%";
+    a.textContent = items.length > 1 ? "Downloading " + (i + 1) + "/" + items.length + "…" : "Downloading…";
+    try {
+      const r = await fetch(it.href);
+      if (!r.ok || !r.body) throw new Error("fetch failed");
+      const total = Number(r.headers.get("content-length") || 0);
+      if (!total || total > 134217728) throw new Error("stream to disk");
+      const reader = r.body.getReader();
+      const chunks = []; let got = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value); got += value.length;
+        if (total) fill.style.width = Math.min(100, Math.round(100 * got / total)) + "%";
+      }
+      const url = URL.createObjectURL(new Blob(chunks));
+      clickAnchor(url, it.name);
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      clickAnchor(it.href, it.name); // big/unknown: browser streams it to disk
     }
-    const blob = new Blob(chunks);
-    const url = URL.createObjectURL(blob);
-    const tmp = document.createElement("a");
-    tmp.href = url; tmp.download = a.download || "download";
-    document.body.append(tmp); tmp.click(); tmp.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-    fill.style.width = "100%";
-    setTimeout(() => { bar.hidden = true; }, 1500);
-  } catch {
-    a.dataset.direct = "1";
-    location.href = a.href;
+    // A short gap lets the browser register each download before the next.
+    if (i < items.length - 1) await new Promise((r) => setTimeout(r, 350));
   }
+  fill.style.width = "100%";
+  a.textContent = label;
+  a.dataset.busy = "";
+  setTimeout(() => { bar.hidden = true; }, 1500);
 });
 // ---- Direct P2P via WebRTC DataChannel ----
 const p2pBtn = document.getElementById("p2p"), p2pStatus = document.getElementById("p2p-status");

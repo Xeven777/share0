@@ -63,13 +63,20 @@ If this saves you a WeTransfer upload, please [star the repo](https://github.com
 
 ## 🚀 Quick start
 
-Install the binary:
+Install with npm (Node 18+). The package pulls the prebuilt binary for your
+platform and verifies its checksum:
+
+```bash
+npm i -g share0-cli      # the installed command is still `share0`
+```
+
+Or install the standalone binary straight from GitHub Releases:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Xeven777/share0/main/scripts/install.sh | bash
 ```
 
-Or download it manually from [Releases](https://github.com/Xeven777/share0/releases) and put it on your PATH.
+Or download a prebuilt binary from [Releases](https://github.com/Xeven777/share0/releases) and put it on your PATH.
 
 Run from source with [Bun](https://bun.sh) 1.1 or newer:
 

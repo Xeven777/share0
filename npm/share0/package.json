@@ -1,18 +1,28 @@
 {
   "name": "share0-cli",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Share files from your machine, without uploading them anywhere.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Xeven777/share0.git"
+    "url": "git+https://github.com/Xeven777/share0.git"
   },
   "homepage": "https://github.com/Xeven777/share0#readme",
-  "keywords": ["share", "p2p", "file-sharing", "tunnel", "qr"],
+  "keywords": [
+    "share",
+    "p2p",
+    "file-sharing",
+    "tunnel",
+    "qr"
+  ],
   "bin": {
-    "share0": "./bin/share0.js"
+    "share0": "bin/share0.js"
   },
-  "files": ["bin/", "install.js", "README.md"],
+  "files": [
+    "bin/",
+    "install.js",
+    "README.md"
+  ],
   "scripts": {
     "postinstall": "node install.js"
   },

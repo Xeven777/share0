@@ -191,6 +191,8 @@ export function startHeartbeat(
   const beat = async () => {
     if (stopped) return;
     if (writes >= maxWrites) {
+      stopped = true;
+      clearInterval(timer);
       opts.onError?.(
         new HubError(`heartbeat write cap reached (${maxWrites}) — handle expires in ~${ANNOUNCE_TTL}s`)
       );

@@ -241,7 +241,7 @@ export async function runSend(pathsIn: string[] | string, flags: SendFlags): Pro
     try { session.sha256 = await sha256FileHead(abs[0]); } catch { /* noop */ }
   }
 
-  const roots = flags.zip ? [] : multi ? abs : abs;
+  const roots = flags.zip ? [] : abs;
 
   // --- port ---
   let port = flags.port ?? 8787;

@@ -1,6 +1,6 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
-import { basename, join, normalize, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, normalize, relative, resolve, sep } from "node:path";
 import type { ShareSession } from "@share/core";
 import { verifyPassword } from "@share/core";
 import type { FileEntry, ShareMeta } from "@share/protocol";
@@ -102,6 +102,41 @@ async function resolveFile(roots: string[], session: ShareSession, relEncoded: s
     if (basename(only) === decodeURIComponent(relEncoded) || entries_match(only, relEncoded)) return only;
     // Also allow /download/<anything> to serve the single file when only one file exists
     return only;
+  }
+  // Directory share: a request for the folder itself (its display name, with or
+  // without the trailing slash) matches no file on its own. The receiver page's
+  // primary Download button used to point exactly here, so instead of the image
+  // the recipient received a text "Not found" body. Serve the first file so a
+  // folder share always yields real bytes.
+  if (roots.length === 1 && isFolderRequest(relEncoded, roots[0], session.name)) {
+    return firstFileIn(roots[0]);
+  }
+  return null;
+}
+
+/** True when a download path names the shared folder rather than a file inside it. */
+function isFolderRequest(relEncoded: string, root: string, shareName: string): boolean {
+  let decoded = relEncoded;
+  try { decoded = decodeURIComponent(relEncoded); } catch { /* keep raw */ }
+  const bare = decoded.replace(/[\\/]+$/, "");
+  const rootName = basename(root);
+  const shareBare = shareName.replace(/[\\/]+$/, "");
+  return bare === "" || bare === rootName || bare === shareBare;
+}
+
+/** First regular file inside a directory, walked in sorted order. */
+async function firstFileIn(dir: string): Promise<string | null> {
+  if (!statSync(dir).isDirectory()) return dir;
+  const names = (await readdir(dir).catch(() => [] as string[])).sort();
+  for (const name of names) {
+    const full = join(dir, name);
+    const s = await stat(full).catch(() => null);
+    if (!s) continue;
+    if (s.isFile()) return full;
+    if (s.isDirectory()) {
+      const nested = await firstFileIn(full);
+      if (nested) return nested;
+    }
   }
   return null;
 }
@@ -268,17 +303,27 @@ async function serveFile(
     return new Response(null, { headers: { ...baseHeaders, "content-length": String(size) } });
   }
 
+  // Only real downloads count toward --downloads. An inline preview (the
+  // receiver page auto-previews a single image/video) must not consume quota,
+  // and one download fetched over several Range requests must count once.
+  const counts = disposition === "attachment";
   if (!range) {
-    ctx.session.downloads += 1;
-    ctx.onDownload?.(size);
+    if (counts) {
+      ctx.session.downloads += 1;
+      ctx.onDownload?.(size);
+    }
     const file = Bun.file(absPath);
     return new Response(file, { headers: { ...baseHeaders, "content-length": String(size) } });
   }
 
   const { start, end } = range;
   const len = end - start + 1;
-  ctx.session.downloads += 1;
-  ctx.onDownload?.(len);
+  // A video seek / resumable download hits this route many times for one
+  // transfer; only the opening request (start 0) counts.
+  if (counts && start === 0) {
+    ctx.session.downloads += 1;
+    ctx.onDownload?.(len);
+  }
   const file = Bun.file(absPath).slice(start, end + 1);
   return new Response(file, {
     status: 206,
@@ -290,14 +335,45 @@ async function serveFile(
   });
 }
 
+/** Base directory + relative path arguments for `zip`, so the archive keeps the
+ *  shared name (folder/…) rather than the sender's absolute filesystem path. */
+function zipInvocation(roots: string[]): { cwd: string; names: string[] } {
+  const abs = roots.map((r) => resolve(r));
+  const cwd = abs.map((r) => dirname(r)).reduce((a, b) => commonDir(a, b));
+  const names = abs.map((r) => {
+    const rel = relative(cwd, r);
+    return rel === "" ? "." : rel;
+  });
+  return { cwd, names };
+}
+
+/** Longest directory common to two absolute paths (path-segment compare). */
+function commonDir(a: string, b: string): string {
+  const as = resolve(a).split(sep);
+  const bs = resolve(b).split(sep);
+  const out: string[] = [];
+  for (let i = 0; i < Math.min(as.length, bs.length); i++) {
+    if (as[i] !== bs[i]) break;
+    out.push(as[i]!);
+  }
+  const joined = out.join(sep);
+  return joined === "" ? sep : joined;
+}
+
 async function streamDynamicZip(req: Request, roots: string[], name: string, ctx: ServeContext): Promise<Response> {
-  // Stream via system `zip -qr - <paths>` to stdout (no temp file, no full buffering).
-  const proc = Bun.spawn(["zip", "-qr", "-", ...roots.flatMap((r) => [r])], {
+  // Run from a shared base directory with relative paths so the archive stores
+  // "folder/file" instead of the sender's absolute "/home/you/folder/file".
+  const { cwd, names } = zipInvocation(roots);
+  const proc = Bun.spawn(["zip", "-qr", "-", ...names], {
+    cwd,
     stdout: "pipe",
     stderr: "pipe",
   });
   ctx.session.downloads += 1;
-  const filename = name.endsWith(".zip") ? name : `${name}.zip`;
+  // Folder shares carry a trailing slash ("images/"); strip it so the archive
+  // is named "images.zip" instead of the malformed "images/.zip".
+  const base = name.replace(/[\\/]+$/, "") || "share";
+  const filename = base.endsWith(".zip") ? base : `${base}.zip`;
   const stream = proc.stdout as unknown as ReadableStream;
   void proc.exited.then((code) => {
     if (code !== 0) console.error(`[share] dynamic zip exited with code ${code}`);

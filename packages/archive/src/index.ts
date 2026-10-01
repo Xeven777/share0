@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
+import { dirname, relative, resolve, sep } from "node:path";
 
 /** Create a ZIP archive. Prefers archiver-zip-encrypted when a password is set,
  *  falls back to the system `zip` binary, then to an unencrypted archiver build. */
@@ -59,19 +60,46 @@ async function createZipEncrypted(paths: string[], outPath: string, password: st
 }
 
 function createZipSystem(paths: string[], outPath: string, password?: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolveP, reject) => {
     const missing = paths.filter((p) => !existsSync(p));
     if (missing.length) return reject(new Error(`No such file: ${missing[0]}`));
-    const args = ["-qr", outPath, ...paths];
+    // Run from a shared base directory with relative paths so the archive keeps
+    // the shared name (folder/…) instead of the sender's absolute path.
+    const { cwd, names } = zipInvocation(paths);
+    const args = ["-qr", outPath, ...names];
     if (password) args.unshift("-P", password);
-    // run from / so relative handling stays simple — pass absolute paths
-    const child = spawn("zip", args);
+    const child = spawn("zip", args, { cwd });
     let stderr = "";
     child.stderr.on("data", (d) => (stderr += d));
     child.on("close", (code) => {
-      if (code === 0) resolve();
+      if (code === 0) resolveP();
       else reject(new Error(`zip failed (code ${code}): ${stderr || "is 'zip' installed?"}`));
     });
     child.on("error", (e) => reject(new Error(`zip binary not available: ${(e as Error).message}`)));
   });
+}
+
+/** Base directory + relative path arguments for `zip`, so the archive keeps the
+ *  shared name (folder/…) rather than the sender's absolute filesystem path. */
+function zipInvocation(paths: string[]): { cwd: string; names: string[] } {
+  const abs = paths.map((p) => resolve(p));
+  const cwd = abs.map((p) => dirname(p)).reduce((a, b) => commonDir(a, b));
+  const names = abs.map((p) => {
+    const rel = relative(cwd, p);
+    return rel === "" ? "." : rel;
+  });
+  return { cwd, names };
+}
+
+/** Longest directory common to two absolute paths (path-segment compare). */
+function commonDir(a: string, b: string): string {
+  const as = resolve(a).split(sep);
+  const bs = resolve(b).split(sep);
+  const out: string[] = [];
+  for (let i = 0; i < Math.min(as.length, bs.length); i++) {
+    if (as[i] !== bs[i]) break;
+    out.push(as[i]!);
+  }
+  const joined = out.join(sep);
+  return joined === "" ? sep : joined;
 }
